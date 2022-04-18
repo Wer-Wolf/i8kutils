@@ -18,6 +18,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 #include <ctype.h>
 #include <stdlib.h>
 #include <fcntl.h>
@@ -27,7 +28,6 @@
 #include <unistd.h>
 
 #include "i8k.h"
-#include "i8kctl.h"
 
 static int i8k_fd;
 
@@ -314,29 +314,28 @@ status()
     return 0;
 }
 
+double timestamp()
+{
+	struct timespec stamp;
+	double seconds;
+
+	clock_gettime(CLOCK_MONOTONIC, &stamp);
+	seconds = stamp.tv_nsec;
+	seconds /= 1000000000;
+	seconds += stamp.tv_sec;
+
+	return seconds;
+}
+
+
 void
 usage()
 {
     printf("Usage: i8kctl [fan [<l> <r>] | speed | version | bios | id | temp" \
-           "| ac | fn]\n");
+           "| ac | fn | time]\n");
     printf("       i8kctl [-h]\n");
 }
 
-#ifdef LIB
-void init()
-{
-    i8k_fd = open(I8K_PROC, O_RDONLY);
-    if (i8k_fd < 0)
-    {
-        perror("can't open " I8K_PROC);
-        exit(-1);
-    }
-}
-void finish()
-{
-    close(i8k_fd);
-}
-#else
 int
 main(int argc, char **argv)
 {
@@ -391,6 +390,59 @@ main(int argc, char **argv)
     else if (strcmp(argv[1],"fn")==0) {
         ret = fn_key();
     }
+    else if (strcmp(argv[1], "time") == 0) {
+        double stamp[16];
+	stamp[0] = timestamp();
+	i8k_get_bios_version();
+	stamp[1] = timestamp();
+	i8k_get_machine_id();
+	stamp[2] = timestamp();
+	i8k_get_cpu_temp();
+	stamp[3] = timestamp();
+	i8k_get_fan_status(I8K_FAN_LEFT);
+	stamp[4] = timestamp();
+	i8k_get_fan_status(I8K_FAN_RIGHT);
+	stamp[5] = timestamp();
+	i8k_get_fan_speed(I8K_FAN_LEFT);
+	stamp[6] = timestamp();
+	i8k_get_fan_speed(I8K_FAN_RIGHT);
+	stamp[7] = timestamp();
+	i8k_get_power_status();
+	stamp[8] = timestamp();
+	i8k_get_fn_status();
+	stamp[9] = timestamp();
+	i8k_set_fan(I8K_FAN_LEFT, I8K_FAN_OFF);
+	stamp[10] = timestamp();
+	i8k_set_fan(I8K_FAN_LEFT, I8K_FAN_LOW);
+	stamp[11] = timestamp();
+	i8k_set_fan(I8K_FAN_LEFT, I8K_FAN_HIGH);
+	stamp[12] = timestamp();
+	i8k_set_fan(I8K_FAN_RIGHT, I8K_FAN_OFF);
+	stamp[13] = timestamp();
+	i8k_set_fan(I8K_FAN_RIGHT, I8K_FAN_LOW);
+	stamp[14] = timestamp();
+	i8k_set_fan(I8K_FAN_RIGHT, I8K_FAN_HIGH);
+	stamp[15] = timestamp();
+
+	printf("functions time:\n");
+	printf("i8k_get_bios_version() = %lf\n", stamp[1] - stamp[0]);
+	printf("i8k_get_machine_id() = %lf\n", stamp[2] - stamp[1]);
+	printf("i8k_get_cpu_temp() = %lf\n", stamp[3] - stamp[2]);
+	printf("i8k_get_fan_status() = %lf\n", stamp[4] - stamp[3]);
+	printf("i8k_get_fan_status() = %lf\n", stamp[5] - stamp[4]);
+	printf("i8k_get_fan_speed() = %lf\n", stamp[6] - stamp[5]);
+	printf("i8k_get_fan_speed() = %lf\n", stamp[7] - stamp[6]);
+	printf("i8k_get_power_status() = %lf\n", stamp[8] - stamp[7]);
+	printf("i8k_get_fn_status() = %lf\n", stamp[9] - stamp[8]);
+	printf("i8k_set_fan() = %lf\n", stamp[10] - stamp[9]);
+	printf("i8k_set_fan() = %lf\n", stamp[11] - stamp[10]);
+	printf("i8k_set_fan() = %lf\n", stamp[12] - stamp[11]);
+	printf("i8k_set_fan() = %lf\n", stamp[13] - stamp[12]);
+	printf("i8k_set_fan() = %lf\n", stamp[14] - stamp[13]);
+	printf("i8k_set_fan() = %lf\n", stamp[15] - stamp[14]);
+
+	ret = 0;
+    }
 
     close(i8k_fd);
 
@@ -399,4 +451,3 @@ main(int argc, char **argv)
 
     return 0;
 }
-#endif
