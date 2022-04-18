@@ -139,8 +139,8 @@ The driver accepts the following parameters:
 	allow fan control only to processes with the CAP_SYS_ADMIN capability
 	set or processes run as root. In this case normal users will be able
 	to read temperature and fan status but not to control the fan.
-	If your notebook is shared with other users and you don't trust them
-	you may want to use this option.
+	Disabling this option might allow malicious programs to damage your
+	hardware by disabling fan control.
 
     power_status=1
 
@@ -171,10 +171,6 @@ line "dell-smm-hwmon" into the file /etc/modules or use the modconf utility. For
     dell-smm-hwmon
 
 Any module parameters must be specified in /etc/modprobe.d/dell-smm-hwmon.conf.
-Recent kernels required the option below to work.
-
-    $ cat /etc/modprobe.d/dell-smm-hwmon.conf 
-    options dell-smm-hwmon restricted=0
 
 
 THE I8KCTL UTILITY
@@ -187,6 +183,8 @@ can be read from the /proc/i8k file.
 A main difference between 'i8kctl' and '/proc/i8k' is that i8kctl gets and sets
 parameters in real-time. What not happens in /proc/i8k which is updated from
 time to time by the kernel module.
+
+In order to modify fan speeds, the utility requires root privileges.
 
 The program can take an optional argument which can be used to select only one
 of the items and to control the fan status.

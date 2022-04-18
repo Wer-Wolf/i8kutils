@@ -31,7 +31,6 @@ NAME=i8kmon
 DAEMON=/usr/bin/i8kmon
 PROC_I8K=/proc/i8k
 DESC="Fan control for Dell laptops"
-I8KMON_ARGS="--nouserconfig"
 PIDFILE=/var/run/$NAME.pid
 
 test -x $DAEMON || (log_failure_msg "Could not find $DAEMON."; exit 5)
@@ -44,7 +43,7 @@ case "$1" in
 			exit 1
 		fi
 		start-stop-daemon --start --quiet --pidfile $PIDFILE \
-			--background --make-pidfile --startas $DAEMON -- $I8KMON_ARGS
+			--background --make-pidfile --startas $DAEMON
 		;;
 	stop)
 		log_success_msg "Stopping $DESC" "$NAME"

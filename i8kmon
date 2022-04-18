@@ -17,10 +17,8 @@
 
 array set config {
     sysconfig	/etc/i8kmon.conf
-    userconfig	~/.i8kmon
     i8kfan	/usr/bin/i8kfan
     acpi    "acpi"
-    use_conf    1
     verbose	0
     timeout	2
     t_high	80
@@ -60,17 +58,6 @@ proc read_config {} {
 	if {$config(verbose) > 0} {
 	    puts "reading system config file"
 	}
-    }
-
-    # read user config file
-    # as it is read last, the options here have precedence
-    if {$config(use_conf) != 0} {
-        if {[file exists $config(userconfig)]} {
-            source $config(userconfig)
-	    if {$config(verbose) > 0} {
-		puts "reading user config file"
-	    }
-    	}
     }
 
     for {set key 0}  {$key < $config(num_configs)} {incr key} {
@@ -261,7 +248,6 @@ proc usage {} {
     regsub -all {^.*/} $argv0 {} progname
     puts "Usage:  $progname \[<options>...]\n"
     puts "Options:\n"
-    puts "   -nc|--nouserconfig       don\x27t read \$HOME/.i8kmon"
     puts "    -v|--verbose            report log to stdout"
     puts "    -t|--timeout <secs>     set poll timeout\n"
 }
@@ -277,9 +263,6 @@ proc parse_options {} {
 	    -\? - -h - -help - --help {
 		usage
 		exit
-	    }
-	    --nouserconfig - -nc {
-		set config(use_conf) 0
 	    }
 	    --verbose - -v {
 		set config(verbose) 1

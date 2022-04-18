@@ -25,9 +25,6 @@ On Debian and derivated OSes, i8kmon starts in the background by default as a se
 i8kmon accepts the following command\-line options when initiated by the user,
 not as a service:
 .TP
-\fB\-nc\fR, \fB\-\-nouserconfig\fR
-Doesn't read ~/.i8kmon configfile, only /etc/i8kmon.conf.
-.TP
 \fB\-v\fR, \fB\-\-verbose\fR
 Report hardware status and program actions on stdout.
 .TP
@@ -51,10 +48,6 @@ i8kfan executable path
 \fBset config(acpi)\fR    "acpi"
 Filename of the apci executable. i8kmon uses acpi to query whether notebook is
 on-line or on battery.
-.TP
-\fBset config(use_conf)\fR    1
-Set whether user configuration file must be read or not when user starting
-i8kmon. Default is 1.
 .TP
 \fBset config(verbose)\fR 0
 Print verbose logs
@@ -110,8 +103,6 @@ set config(2) {{1 -}  60  80  65  85}
 \fI/proc/i8k\fP
 .br
 \fI/etc/i8kmon.conf\fP
-.br
-\fI/$HOME/.i8kmon\fP
 .SH "AUTHORS"
 .LP
 Vitor Augusto <vitorafsr@gmail.com>

@@ -4,7 +4,7 @@ Documentation=man:i8kmon
 ConditionPathExists=/proc/i8k
 
 [Service]
-ExecStart=/usr/bin/i8kmon --nouserconfig
+ExecStart=/usr/bin/i8kmon
 Restart=always
 RestartSec=5
 
