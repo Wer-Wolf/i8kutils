@@ -1,0 +1,6 @@
+project('i8kutils', 'c', license : 'GPL-3.0-or-later', version : '1.43')
+executable('i8kctl', 'i8kctl.c', install : true)
+install_data(['i8kfan', 'i8kmon'], install_dir : get_option('bindir'), install_mode : ['rwxr-xr-x', 'root', 'root'])
+install_data('i8kmon.conf', install_dir : '/etc')
+install_man('i8kctl.1')
+install_man('i8kmon.1')

@@ -197,8 +197,23 @@ of the items and to control the fan status.
 COMPILATION
 ===========
 
-To compile the programs type "make".
+To compile the programs type the following commands:
 
+	meson build --prefix="/usr"
+	cd build
+	meson compile
+
+
+INSTALLATION
+============
+
+To install i8kutils, type the following commands:
+
+	sudo meson install
+
+You must then manually install the provided init scripts if necessary.
+For enabling i8kmon to read the battery status, you must also install
+'acpitool' or 'acpi'.
 
 CONTRIBUTORS
 ============

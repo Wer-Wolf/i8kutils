@@ -1,5 +1,5 @@
-# compiled asset
-i8kctl
+# meson build dir
+build*/
 
 # vim swap files
 /**/*.swp

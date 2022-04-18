@@ -325,14 +325,12 @@ proc probe_fan_speed {} {
 proc probe_tools {} {
     # The possibility of choosing 'acpi' or 'acpitool' is for compatibility
     # between different architectures: amd64, i386, kFreeBSD
-    # This code below is strictly related on package dependency stated at
-    # keyword 'Depends:' on file 'debian/control'
     if {![catch {exec acpi}]} {
         set config(acpi) "acpi"
     } elseif {[catch {exec acpitool}]} {
         set config(acpi) "acpitool"
     } else {
-        puts stderr "Package dependency problem: neither 'acpi' nor 'acpitool' package is installed"
+        puts stderr "Neither 'acpi' nor 'acpitool' is installed"
     }
 }
 
