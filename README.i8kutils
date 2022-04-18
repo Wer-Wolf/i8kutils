@@ -171,6 +171,10 @@ line "dell-smm-hwmon" into the file /etc/modules or use the modconf utility. For
     dell-smm-hwmon
 
 Any module parameters must be specified in /etc/modprobe.d/dell-smm-hwmon.conf.
+To force dell-smm-hwmon to load on unknown hardware, the above file should
+contain the following line:
+
+	options dell-smm-hwmon force=1
 
 
 THE I8KCTL UTILITY
