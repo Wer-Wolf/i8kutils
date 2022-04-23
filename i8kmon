@@ -21,7 +21,6 @@ array set config {
     acpi    "acpi"
     verbose	0
     timeout	2
-    t_high	80
     num_configs	5
     0		{{0 0}  -1  60  -1  65}
     1		{{1 0}  50  70  55  75}
