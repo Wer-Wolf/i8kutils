@@ -15,39 +15,19 @@ I8KUTILS
 OVERVIEW
 ========
 
-i8kutils package contains user-space programs for controlling the fans on some Dell
-laptops.
-
-Note: i8kutils is entirely built upon the dell-smm-hwmon kernel module.
-
-These data contains the states and the system temperature along
-with others infos. The fields returned in a query to the system are
-summarized below.
-
-    * BIOS version
-
-    * Dell service tag (later known as 'serial number')
-
-    * CPU temperature
-
-    * fan status
-
-    * fan rotation speed (only on some models)
-
-    * ac power status
-
-    * volume buttons status (not the multimedia buttons)
-
-The data are collected from the dell-smm-hwmon kernel module that is included in recent
-kernels.
+i8kutils is a collection of utilities for controlling the fans on some Dell
+laptops. The utilities are entirely built upon the `dell-smm-hwmon` kernel
+module.
 
 The i8kutils package includes the following utilities:
 
-    * i8kctl	 - command-line interface to the kernel module
+* i8kctl, a command-line utility for interfacing with the kernel module.
+* i8kmon, a temperature monitor with fan control capability.
+* i8kfan, a utility to set the state (speed) of fans.
 
-    * i8kmon   - temperature monitor with fan control capability
-
-    * i8kfan   - utility to set state (speed) of fans
+Since 2011 (kernel version 3.0), the kernel module exports temperature and
+fan data over the standard linux hwmon interface. If you are running a recent
+enough kernel, you might want to take a look at the [lm-sensors project](https://github.com/lm-sensors/lm-sensors).
 
 The i8kctl perform queries and sets related to fan control as
 read temperature, turn the fan on. The i8kmon continuously monitor the
@@ -90,10 +70,10 @@ On Debian GNU/Linux systems, the complete text of the GNU General
 Public License can be found in `/usr/share/common-licenses/GPL'.
 
 
-THE KERNEL DRIVER
+THE KERNEL MODULE
 =================
 
-The information provided by the kernel driver can be accessed by simply
+The information provided by the kernel module can be accessed by simply
 reading the /proc/i8k file. For example:
 
     $ cat /proc/i8k
@@ -128,34 +108,35 @@ same information and to control the fan status. The ioctl interface can be
 accessed from C programs or from shell using the i8kctl utility. See the
 source file i8kctl.c for more information on how to use the ioctl interface.
 
+If the /proc/i8k file does not exist, then check wether the kernel module
+is loaded and the kernel has the config option `CONFIG_I8K` enabled.
+
+The documentation of the `dell_smm_hwmon` kernel driver can be found
+[here](https://www.kernel.org/doc/html/latest/hwmon/dell-smm-hwmon.html).
+
 The driver accepts the following parameters:
 
-    force=1
+* ignore_dmi=1
+    * forces the driver to load on unknown hardware
 
-	force loading of the driver on unknown hardware.
+* force=1
+    * forces the driver to load on unsupported/buggy hardware
+    * might cause problems since it also disables all blacklists
+      for buggy hardware, use only when ignore_dmi=1 is not enough
 
-    restricted=1
+* restricted=1
+    * allows privileged programs to change fan speed
+    * **do not use, since it allows malicous programs to damage your hardware
+      by disabling fan control**
 
-	allow fan control only to processes with the CAP_SYS_ADMIN capability
-	set or processes run as root. In this case normal users will be able
-	to read temperature and fan status but not to control the fan.
-	Disabling this option might allow malicious programs to damage your
-	hardware by disabling fan control.
+* power_status=1
+    * report ac status in /proc/i8k
 
-    power_status=1
+* fan_mult=<int>
+    * overrides the fan speed multiplicator
 
-	report ac status in /proc/i8k. Default is 0.
-
-    repeat_delay=<delay>
-
-	specifies the delay before the driver will start generating repeat
-	events when a button is kept pressed. Default is 250ms.
-	This option is available only with kernel 2.4.
-
-    repeat_rate=<rate>
-
-	specifies the button repeat rate. Default is 10 times for second.
-	This option is available only with kernel 2.4.
+* fan_max=<int>
+    * overrides the maximum fan state.
 
 You can specify the module parameters when loading the module or as kernel
 option when booting the kernel if the driver is compiled statically.
@@ -174,24 +155,22 @@ Any module parameters must be specified in /etc/modprobe.d/dell-smm-hwmon.conf.
 To force dell-smm-hwmon to load on unknown hardware, the above file should
 contain the following line:
 
-	options dell-smm-hwmon force=1
+    options dell-smm-hwmon force=1
 
 
 THE I8KCTL UTILITY
 ==================
 
-The i8kctl utility provides a command-line interface to the dell-smm-hwmon kernel driver.
+The i8kctl utility provides a command-line interface to the `dell-smm-hwmon` kernel driver.
 When invoked without arguments the program reports the same information which
 can be read from the /proc/i8k file.
-
-A main difference between 'i8kctl' and '/proc/i8k' is that i8kctl gets and sets
-parameters in real-time. What not happens in /proc/i8k which is updated from
-time to time by the kernel module.
 
 In order to modify fan speeds, the utility requires root privileges.
 
 The program can take an optional argument which can be used to select only one
 of the items and to control the fan status.
+
+The `sensors` utility from lm-sensors provides similar data.
 
 
 COMPILATION
@@ -199,9 +178,9 @@ COMPILATION
 
 To compile the programs type the following commands:
 
-	meson build --prefix="/usr"
-	cd build
-	meson compile
+    meson build --prefix="/usr"
+    cd build
+    meson compile
 
 
 INSTALLATION
@@ -209,54 +188,46 @@ INSTALLATION
 
 To install i8kutils, type the following commands:
 
-	sudo meson install
+    sudo meson install
 
 You must then manually install the provided init scripts if necessary.
 For enabling i8kmon to read the battery status, you must also install
-'acpitool' or 'acpi'.
+'acpitool' or 'acpi', otherwise i8kmon will assume that it always
+runs on ac power.
 
 CONTRIBUTORS
 ============
 
 Contributors are listed here, in alphabetical order.
 
-    Pablo Bianucci <pbian@physics.utexas.edu>
+* Pablo Bianucci <pbian@physics.utexas.edu>
+    * support for /proc/acpi
 
-	support for /proc/acpi
+* David Bustos <bustos@caltech.edu>
+    * patches for generating keyboard events
 
-    David Bustos <bustos@caltech.edu>
+* Jonathan Buzzard <jonathan@buzzard.org.uk>
+    * basic information on the SMM BIOS and the Toshiba SMM driver
+    * Asm code for calling the SMM BIOS on the I8K. Without his help
+      this work wouldn't have been possible.
 
-	patches for generating keyboard events
+* Karl E. Jørgensen <karl@jorgensen.com>
+    * init script for i8kmon daemon
 
-    Jonathan Buzzard <jonathan@buzzard.org.uk>
+* Stephane Jourdois <stephane@tuxfinder.org>
+    * patches for correctly interpreting buttons status in the i8k driver
 
-	basic information on the SMM BIOS and the Toshiba SMM driver.
-	Asm code for calling the SMM BIOS on the I8K. Without his help
-	this work wouldn't have been possible.
+* Marcel J.E. Mol <marcel@mesa.nl>
+    * patches for the --repeat option in the i8kbuttons (obsolete on Abr 30, 2014) util
 
-    Karl E. Jørgensen <karl@jorgensen.com>
+* Gianni Tedesco <gianni@ecsc.co.uk>
+    * patch to restrict fan contol to SYS_ADMIN capability
 
-	init script for i8kmon daemon
+* David Woodhouse <dwmw2@redhat.com>
+    * suggestions on how to avoid the zombies in i8kbuttons (obsolete on Abr 30, 2014)
 
-    Stephane Jourdois <stephane@tuxfinder.org>
-
-	patches for correctly interpreting buttons status in the i8k driver
-
-    Marcel J.E. Mol <marcel@mesa.nl>
-
-	patches for the --repeat option in the i8kbuttons (obsolete on Abr 30, 2014) util
-
-    Gianni Tedesco <gianni@ecsc.co.uk>
-
-	patch to restrict fan contol to SYS_ADMIN capability
-
-    David Woodhouse <dwmw2@redhat.com>
-
-  suggestions on how to avoid the zombies in i8kbuttons (obsolete on Abr 30, 2014)
-
-    Vitor Augusto <vitorafsr@gmail.com>
-
-  fixes for the freeze bug at i8kmon, general update and bug fixes
+* Vitor Augusto <vitorafsr@gmail.com>
+    * fixes for the freeze bug at i8kmon, general update and bug fixes
 
 and many others who tested the driver on their hardware and sent reports
 and patches.
@@ -264,6 +235,5 @@ and patches.
 No credits to DELL Computer who has always refused to give support on Linux
 or provide any useful information on the I8K buttons and their buggy BIOS.
 
-
---
+---
 Massimo Dal Zotto <dz@debian.org>
