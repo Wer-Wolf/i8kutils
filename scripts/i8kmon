@@ -17,7 +17,6 @@
 
 array set config {
     sysconfig	/etc/i8kmon.conf
-    i8kfan	/usr/bin/i8kfan
     acpi    "acpi"
     verbose	0
     timeout	2
@@ -46,6 +45,51 @@ array set status {
     t_low	0
     t_high	0
 }
+
+proc i8kfan {{left "-"} {right "-"}} {
+    if {$left != "-"} {
+        catch {exec "i8kctl" "-s" "fan" "-n" "2" $left}
+    }
+    if {$right != "-"} {
+        catch {exec "i8kctl" "-s" "fan" "-n" "1" $right}
+    }
+
+    if {[catch {exec "i8kctl" "-s" "fan" "-n" "2"} new_left]} {
+        set new_left -1
+    }
+
+    if {[catch {exec "i8kctl" "-s" "fan" "-n" "1"} new_right]} {
+        set new_right -1
+    }
+
+    return [list $new_left $new_right]
+}
+
+proc i8kctl {cmd} {
+    switch $cmd {
+        "speed" {
+            if {[catch {exec "i8kctl" "-s" "tacho" "-n" "2"} left]} {
+                set left -1
+            }
+            if {[catch {exec "i8kctl" "-s" "tacho" "-n" "1"} right]} {
+                set right -1
+            }
+
+            return [list $left $right]
+        }
+        "temp" {
+            if {[catch {exec "i8kctl" "-s" "temp" "-n" "1"} temp]} {
+                return -1;
+            }
+
+            return $temp
+        }
+        default {
+            return [list -1 -1]
+        }
+    }
+}
+
 
 proc read_config {} {
     global config
@@ -111,9 +155,9 @@ proc read_i8k_status {} {
     global config
     global status
 
-    set temp [eval exec "i8kctl temp"]
+    set temp [i8kctl "temp"]
     set status(temp) $temp
-    set state [eval exec "i8kctl fan"]
+    set state [i8kfan]
     set status(lstate) [lindex $state 0]
     set status(rstate) [lindex $state 1]
 
@@ -132,11 +176,7 @@ proc read_i8k_status {} {
 	set status(rspeed) -1
     }
 
-    # If AC status is not available read it from procfs
-    set ac [eval exec "i8kctl ac"]
-    if {$ac < 0} {
-	read_ac_status
-    }
+    read_ac_status
 
     if {$config(verbose) > 0} {
         puts "temp, left fan state, right fan state, ac state: $status(temp) $status(lstate) $status(rstate) $status(ac)"
@@ -235,10 +275,10 @@ proc set_fan {state} {
     if {$left == "-" && $right == "-"} {return}
     
     if {$config(verbose) > 0} {
-        puts "$config(i8kfan) $left $right"
+        puts "i8kfan $left $right"
     }
 
-    exec $config(i8kfan) $left $right
+    i8kfan $left $right
 }
 
 proc usage {} {
@@ -294,21 +334,21 @@ proc probe_fan_speed {} {
 	return
     }
 
-    exec $config(i8kfan) 1 1
+    i8kfan 1 1
     after 1000
-    set speeds [eval exec "i8kctl speed"]
+    set speeds [i8kctl "speed"]
     set lspeed1 [lindex $speeds 0]
     set rspeed1 [lindex $speeds 1]
 
-    exec $config(i8kfan) 2 2
+    i8kfan 2 2
     after 1000
-    set speeds [eval exec "i8kctl speed"]
+    set speeds [i8kctl "speed"]
     set lspeed2 [lindex $speeds 0]
     set rspeed2 [lindex $speeds 1]
 
-    exec $config(i8kfan) 3 3
+    i8kfan 3 3
     after 1000
-    set speeds [eval exec "i8kctl speed"]
+    set speeds [i8kctl "speed"]
     set lspeed3 [lindex $speeds 0]
     set rspeed3 [lindex $speeds 1]
 

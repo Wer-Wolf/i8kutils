@@ -1,453 +1,272 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  * i8kctl.c -- Utility to query the i8k kernel module on Dell laptops to
- * retrieve information
+ * retrieve sensor information
  *
+ * Copyright (C) 2022 Armin Wolf <W_Armin@gmx.de>
  * Copyright (C) 2013-2017 Vitor Augusto <vitorafsr@gmail.com>
  * Copyright (C) 2001  Massimo Dal Zotto <dz@debian.org>
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
- * Free Software Foundation; either version 2, or (at your option) any
- * later version.
- *
- * This program is distributed in the hope that it will be useful, but
- * WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * General Public License for more details.
  */
 
+#include <argp.h>
 #include <stdio.h>
 #include <string.h>
-#include <time.h>
+#include <sysexits.h>
 #include <ctype.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <fcntl.h>
 #include <sys/types.h>
-#include <sys/stat.h>
-#include <sys/ioctl.h>
 #include <unistd.h>
 
-#include "i8k.h"
+#include "i8k-generic.h"
+#include "i8k-procfs.h"
+#include "i8k-sysfs.h"
 
-static int i8k_fd;
+#define ARRAY_SIZE(array)	(sizeof(array) / sizeof((array)[0]))
 
-char *
-i8k_get_bios_version()
-{
-    char i8k_ioctl_bios_version[4];
+#define DELL_SMM_NUM_FANS	3
+#define DELL_SMM_NUM_TEMP	10
 
-    char i8k_proc_format[16];
-    char i8k_proc_bios_version[4];
-    char i8k_proc_serial_version[16];
-    int i8k_proc_cpu_temp;
-    int i8k_proc_left_fan;
-    int i8k_proc_right_fan;
-    int i8k_proc_left_speed;
-    int i8k_proc_right_speed;
-    int i8k_proc_ac_power;
-    int i8k_proc_fn_key;
+enum sensor_types {
+	SENSOR_NONE,
+	SENSOR_FAN,
+	SENSOR_TACHO,
+	SENSOR_TEMP
+};
 
-    char proc_i8k_str[64];
-    int args[1];
-    int rc_read;
-    int ret_nargs;
+struct sensor_name {
+	const char *name;
+	const enum sensor_types type;
+};
 
-    if ((rc_read=read(i8k_fd, proc_i8k_str, 64*sizeof(char))) != -1) {
+struct arguments {
+	enum sensor_types sensor_type;
+	int sensor_number;
+	int sensor_value;
+};
 
-        ret_nargs = sscanf(proc_i8k_str, "%s %s %s %d %d %d %d %d %d %d\n",
-               i8k_proc_format,
-               i8k_proc_bios_version,
-               i8k_proc_serial_version,
-               &i8k_proc_cpu_temp,
-               &i8k_proc_left_fan,
-               &i8k_proc_right_fan,
-               &i8k_proc_left_speed,
-               &i8k_proc_right_speed,
-               &i8k_proc_ac_power,
-               &i8k_proc_fn_key);
-
-        if (ret_nargs == 10) {
-            if (strncmp(i8k_proc_format, I8K_PROC_FMT, 16) == 0) {
-
-                // Stop this function here and return.
-                // Information from /proc/i8k is more complete.
-                // So it is preferred here.
-                // ioctl for BIOS version at the kernel module i8k returns
-                // only the SMM version. The information of bios version in
-                // '/proc/i8k' is from SMM data and DMI table.
-                return strdup(i8k_proc_bios_version);
-            }
-
-        }
-    }
-
-    // Useless in some Dell systems for i8k kernel module dated 2013-05-30.
-    if (ioctl(i8k_fd, I8K_BIOS_VERSION, &args) != 0) {
-        i8k_ioctl_bios_version[0] = (args[0] >> 16) & 0xff;
-        i8k_ioctl_bios_version[1] = (args[0] >>  8) & 0xff;
-        i8k_ioctl_bios_version[2] = (args[0]      ) & 0xff;
-        i8k_ioctl_bios_version[3] = '\0';
-        return strdup(i8k_ioctl_bios_version);
-    }
-
-    return 0;
-}
-
-char *
-i8k_get_machine_id()
-{
-    char args[16];
-    int rc;
-
-    if ((rc=ioctl(i8k_fd, I8K_MACHINE_ID, &args)) < 0) {
-	return NULL;
-    }
-
-    return strdup(args);
-}
-
-int
-i8k_set_fan(int fan, int speed)
-{
-    int args[2];
-    int rc;
-
-    args[0] = fan;
-    args[1] = speed;
-    if ((rc=ioctl(i8k_fd, I8K_SET_FAN, &args)) < 0) {
-	return rc;
-    }
-
-    return args[0];
-}
-
-int
-i8k_get_fan_status(int fan)
-{
-    int args[1];
-    int rc;
-
-    args[0] = fan;
-    if ((rc=ioctl(i8k_fd, I8K_GET_FAN, &args)) < 0) {
-	return rc;
-    }
-
-    return args[0];
-}
-
-int
-i8k_get_fan_speed(int fan)
-{
-    int args[1];
-    int rc;
-
-    args[0] = fan;
-    if ((rc=ioctl(i8k_fd, I8K_GET_SPEED, &args)) < 0) {
-	return rc;
-    }
-
-    return args[0];
-}
-
-int
-i8k_get_cpu_temp()
-{
-    int args[1];
-    int rc;
-
-    if ((rc=ioctl(i8k_fd, I8K_GET_TEMP, &args)) < 0) {
-	return rc;
-    }
-
-    return args[0];
-}
-
-int
-i8k_get_power_status()
-{
-    int args[1];
-    int rc;
-
-    if ((rc=ioctl(i8k_fd, I8K_POWER_STATUS, &args)) < 0) {
-	return rc;
-    }
-
-    return args[0];
-}
-
-int
-i8k_get_fn_status()
-{
-    int args[1];
-    int rc;
-
-    if ((rc=ioctl(i8k_fd, I8K_FN_STATUS, &args)) < 0) {
-	return rc;
-    }
-
-    return args[0];
-}
-
-int
-fan(int argc, char **argv)
-{
-    int left, right;
-
-    if ((argc > 1) && isdigit(argv[1][0])) {
-	left = i8k_set_fan(I8K_FAN_LEFT, atoi(argv[1]));
-    } else {
-	left = i8k_get_fan_status(I8K_FAN_LEFT);
-    }
-
-    if ((argc > 2) && isdigit(argv[2][0])) {
-	right = i8k_set_fan(I8K_FAN_RIGHT, atoi(argv[2]));
-    } else {
-	right = i8k_get_fan_status(I8K_FAN_RIGHT);
-    }
-
-    printf("%d %d\n", left, right);
-    return 0;
-}
-
-int
-fan_speed(int argc, char **argv)
-{
-    int left, right;
-
-    left = i8k_get_fan_speed(I8K_FAN_LEFT);
-    right = i8k_get_fan_speed(I8K_FAN_RIGHT);
-
-    printf("%d %d\n", left, right);
-    return 0;
-}
-
-int
-bios_version()
-{
-    char *version;
-
-    if ((version=i8k_get_bios_version()) == NULL) {
-	version = "?";
-    }
-
-    printf("%s\n", version);
-    return 0;
-}
-
-int
-machine_id()
-{
-    char *machine_id;
-
-    if ((machine_id=i8k_get_machine_id()) == NULL) {
-	machine_id = "?";
-    }
-
-    printf("%s\n", machine_id);
-    return 0;
-}
-
-int
-cpu_temperature()
-{
-    printf("%d\n", i8k_get_cpu_temp());
-    return 0;
-}
-
-int
-ac_status()
-{
-    printf("%d\n", i8k_get_power_status());
-    return 0;
-}
-
-int
-fn_key()
-{
-    printf("%d\n", i8k_get_fn_status());
-    return 0;
-}
-
-int
-status()
-{
-    int fn_key, cpu_temp, ac_power;
-    int left_fan, right_fan, left_speed, right_speed;
-    char *bios_version, *bios_machine_id;
-
-    bios_version    = i8k_get_bios_version();
-    bios_machine_id = i8k_get_machine_id();
-    cpu_temp        = i8k_get_cpu_temp();
-    left_fan        = i8k_get_fan_status(I8K_FAN_LEFT);
-    right_fan       = i8k_get_fan_status(I8K_FAN_RIGHT);
-    left_speed      = i8k_get_fan_speed(I8K_FAN_LEFT);
-    right_speed     = i8k_get_fan_speed(I8K_FAN_RIGHT);
-    ac_power        = i8k_get_power_status();
-    fn_key          = i8k_get_fn_status();
-
-    /*
-     * Info:
-     *
-     * 1)  Proc format version (this will change if format changes)
-     * 2)  BIOS version
-     * 3)  BIOS machine ID
-     * 4)  Cpu temperature
-     * 5)  Left fan status
-     * 6)  Right fan status
-     * 7)  Left fan speed
-     * 8)  Right fan speed
-     * 9)  AC power
-     * 10) Fn Key status
-     */
-    printf("%s %s %s %d %d %d %d %d %d %d\n",
-	   I8K_PROC_FMT,
-	   bios_version,
-	   bios_machine_id,
-	   cpu_temp,
-	   left_fan,
-	   right_fan,
-	   left_speed,
-	   right_speed,
-	   ac_power,
-	   fn_key);
-
-    return 0;
-}
-
-double timestamp()
-{
-	struct timespec stamp;
-	double seconds;
-
-	clock_gettime(CLOCK_MONOTONIC, &stamp);
-	seconds = stamp.tv_nsec;
-	seconds /= 1000000000;
-	seconds += stamp.tv_sec;
-
-	return seconds;
-}
-
-
-void
-usage()
-{
-    printf("Usage: i8kctl [fan [<l> <r>] | speed | version | bios | id | temp" \
-           "| ac | fn | time]\n");
-    printf("       i8kctl [-h]\n");
-}
-
-int
-main(int argc, char **argv)
-{
-    if (argc >= 2) {
-	if ((strcmp(argv[1],"-h")==0) || (strcmp(argv[1],"--help")==0)) {
-	    usage();
-	    exit(0);
+const struct sensor_name sensor_names[] = {
+	{
+		.name = "fan",
+		.type = SENSOR_FAN,
+	},
+	{
+		.name = "tacho",
+		.type = SENSOR_TACHO,
+	},
+	{
+		.name = "temp",
+		.type = SENSOR_TEMP,
 	}
-    }
+};
 
-    i8k_fd = open(I8K_PROC, O_RDONLY);
-    if (i8k_fd < 0) {
-        perror("can't open " I8K_PROC);
-        exit(-1);
-    }
+const char *argp_program_version = "i8kctl version " VERSION;
 
-    /* -2 as a magic number: if var 'ret' reachs the end of main() as -2, than
-     * no command was executed, and the user input was an invalid command
-     */
-    int ret = -2;
+const char argp_program_bug_adress[] = "TODO";
 
-    /* No args, print status: same output as 'cat /proc/i8k' */
-    if (argc < 2) {
-        ret = status();
-        close(i8k_fd);
-        return ret;
-    }
+const char doc[] = "i8kctl -- a utility for fan control on Dell notebooks";
 
-    if (strcmp(argv[1],"fan")==0) {
-        argc--; argv++;
-        ret = fan(argc,argv);
-    }
-    else if (strcmp(argv[1],"version")==0) {
-        printf("%s\n", I8K_PROC_FMT);
-        ret = 0;
-    }
-    else if (strcmp(argv[1],"speed")==0) {
-        ret = fan_speed(argc,argv);
-    }
-    else if (strcmp(argv[1],"bios")==0) {
-        ret = bios_version();
-    }
-    else if (strcmp(argv[1],"id")==0) {
-        ret = machine_id();
-    }
-    else if (strcmp(argv[1],"temp")==0) {
-        ret = cpu_temperature();
-    }
-    else if (strcmp(argv[1],"ac")==0) {
-        ret = ac_status();
-    }
-    else if (strcmp(argv[1],"fn")==0) {
-        ret = fn_key();
-    }
-    else if (strcmp(argv[1], "time") == 0) {
-        double stamp[16];
-	stamp[0] = timestamp();
-	i8k_get_bios_version();
-	stamp[1] = timestamp();
-	i8k_get_machine_id();
-	stamp[2] = timestamp();
-	i8k_get_cpu_temp();
-	stamp[3] = timestamp();
-	i8k_get_fan_status(I8K_FAN_LEFT);
-	stamp[4] = timestamp();
-	i8k_get_fan_status(I8K_FAN_RIGHT);
-	stamp[5] = timestamp();
-	i8k_get_fan_speed(I8K_FAN_LEFT);
-	stamp[6] = timestamp();
-	i8k_get_fan_speed(I8K_FAN_RIGHT);
-	stamp[7] = timestamp();
-	i8k_get_power_status();
-	stamp[8] = timestamp();
-	i8k_get_fn_status();
-	stamp[9] = timestamp();
-	i8k_set_fan(I8K_FAN_LEFT, I8K_FAN_OFF);
-	stamp[10] = timestamp();
-	i8k_set_fan(I8K_FAN_LEFT, I8K_FAN_LOW);
-	stamp[11] = timestamp();
-	i8k_set_fan(I8K_FAN_LEFT, I8K_FAN_HIGH);
-	stamp[12] = timestamp();
-	i8k_set_fan(I8K_FAN_RIGHT, I8K_FAN_OFF);
-	stamp[13] = timestamp();
-	i8k_set_fan(I8K_FAN_RIGHT, I8K_FAN_LOW);
-	stamp[14] = timestamp();
-	i8k_set_fan(I8K_FAN_RIGHT, I8K_FAN_HIGH);
-	stamp[15] = timestamp();
+const char args_doc[] = "[STATE]";
 
-	printf("functions time:\n");
-	printf("i8k_get_bios_version() = %lf\n", stamp[1] - stamp[0]);
-	printf("i8k_get_machine_id() = %lf\n", stamp[2] - stamp[1]);
-	printf("i8k_get_cpu_temp() = %lf\n", stamp[3] - stamp[2]);
-	printf("i8k_get_fan_status() = %lf\n", stamp[4] - stamp[3]);
-	printf("i8k_get_fan_status() = %lf\n", stamp[5] - stamp[4]);
-	printf("i8k_get_fan_speed() = %lf\n", stamp[6] - stamp[5]);
-	printf("i8k_get_fan_speed() = %lf\n", stamp[7] - stamp[6]);
-	printf("i8k_get_power_status() = %lf\n", stamp[8] - stamp[7]);
-	printf("i8k_get_fn_status() = %lf\n", stamp[9] - stamp[8]);
-	printf("i8k_set_fan() = %lf\n", stamp[10] - stamp[9]);
-	printf("i8k_set_fan() = %lf\n", stamp[11] - stamp[10]);
-	printf("i8k_set_fan() = %lf\n", stamp[12] - stamp[11]);
-	printf("i8k_set_fan() = %lf\n", stamp[13] - stamp[12]);
-	printf("i8k_set_fan() = %lf\n", stamp[14] - stamp[13]);
-	printf("i8k_set_fan() = %lf\n", stamp[15] - stamp[14]);
+const struct argp_option options[] = {
+	{
+		.name = "sensor-type",
+		.key = 's',
+		.arg = "type",
+		.doc = "Type of sensor to read/write, can be \"fan\", \"tacho\" or \"temp\"",
+	},
+	{
+		.name = "sensor-number",
+		.key = 'n',
+		.arg = "number",
+		.doc = "Number of sensor to read/write",
+	},
+	{
+		.name = "verbose",
+		.key = 'v',
+		.doc = "Enable verbose output",
+	},
+	{ 0 }
+};
 
-	ret = 0;
-    }
+static error_t parser(int key, char *arg, struct argp_state *state)
+{
+	struct arguments *arguments = state->input;
+	int number, ret;
 
-    close(i8k_fd);
+	switch (key) {
+		case 's':
+			for (int i = 0; i < ARRAY_SIZE(sensor_names); i++) {
+				if (!strcmp(arg, sensor_names[i].name)) {
+					arguments->sensor_type = sensor_names[i].type;
+					return 0;
+				}
+			}
 
-    if (ret == -2) // no command executed
-        fprintf(stderr,"invalid arg: %s\n", argv[1]);
+			argp_failure(state, EX_DATAERR, 0, "Invalid sensor type '%s'", arg);
 
-    return 0;
+			break;
+		case 'n':
+			ret = strtoi(arg, &number);
+			if (ret)
+				argp_failure(state, EX_DATAERR, ret, "Invalid sensor number '%s'", arg);
+
+			if (number < 1)
+				argp_failure(state, EX_DATAERR, 0, "Sensor number cannot be less than 1");
+
+			arguments->sensor_number = number - 1;
+
+			break;
+		case 'v':
+			verbose = true;
+			break;
+		case ARGP_KEY_INIT:
+			arguments->sensor_type = SENSOR_NONE;
+			arguments->sensor_number = -1;
+			arguments->sensor_value = -1;
+			break;
+		case ARGP_KEY_ARG:
+			if (state->arg_num >= 1)
+				argp_error(state, "Too many arguments");
+
+			ret = strtoi(arg, &arguments->sensor_value);
+			if (ret)
+				argp_failure(state, EX_DATAERR, ret, "Invalid sensor value '%s'", arg);
+
+			break;
+		case ARGP_KEY_END:
+			if (arguments->sensor_type != SENSOR_NONE) {
+				if (arguments->sensor_number < 0)
+					argp_failure(state, EX_DATAERR, 0, "Missing sensor number");
+			} else {
+				if (arguments->sensor_number >= 0 || arguments->sensor_value >= 0)
+					argp_failure(state, EX_DATAERR, 0, "Missing sensor type");
+			}
+			break;
+		default:
+			return ARGP_ERR_UNKNOWN;
+	}
+
+	return 0;
+}
+
+const struct argp argument_parser = {
+	.options = options,
+	.parser = parser,
+	.args_doc = args_doc,
+	.doc = doc,
+};
+
+int read_sensor(enum sensor_types type, int number, int *value)
+{
+	int fd, ret;
+
+	if (type == SENSOR_FAN) {
+		ret = procfs_init(&fd);
+		if (ret) {
+			ret = sysfs_init_fan(number, &fd);
+			if (ret)
+				return ret;
+
+			ret = sysfs_get_fan_state(fd, value);
+		} else {
+			ret = procfs_get_fan_state(fd, number, value);
+		}
+	} else {
+		ret = sysfs_init_hwmon(&fd);
+		if (ret)
+			return ret;
+
+		switch (type) {
+		case SENSOR_TACHO:
+			ret = sysfs_get_fan_speed(fd, number, value);
+			break;
+		case SENSOR_TEMP:
+			ret = sysfs_get_temp(fd, number, value);
+			break;
+		default:
+			ret = EINVAL;
+		}
+	}
+
+	close(fd);
+
+	return ret;
+}
+
+int write_sensor(enum sensor_types type, int number, int value)
+{
+	int fd, ret;
+
+	if (type != SENSOR_FAN)
+		return EINVAL;
+
+	ret = procfs_init(&fd);
+	if (ret) {
+		ret = sysfs_init_fan(number, &fd);
+		if (ret)
+			return ret;
+
+		ret = sysfs_set_fan_state(fd, value);
+	} else {
+		ret = procfs_set_fan_state(fd, number, value);
+	}
+
+	close(fd);
+
+	return ret;
+}
+
+void print_overview()
+{
+	int i, state, speed, temp, ret;
+
+	for (i = 0; i < DELL_SMM_NUM_FANS; i++) {
+		ret = read_sensor(SENSOR_FAN, i, &state);
+		if (!ret)
+			printf("Fan %d state: %d\n", i + 1, state);
+
+		ret = read_sensor(SENSOR_TACHO, i, &speed);
+		if (!ret)
+			printf("Fan %d speed: %d RPM\n", i + 1, speed);
+	}
+
+	for (i = 0; i < DELL_SMM_NUM_TEMP; i++) {
+		ret = read_sensor(SENSOR_TEMP, i, &temp);
+		if (!ret)
+			printf("Temperature %d: %d °C\n", i + 1, temp);
+	}
+}
+
+int main(int argc, char **argv)
+{
+	struct arguments arguments = {};
+	int value, ret;
+
+	if (argp_parse(&argument_parser, argc, argv, 0, NULL, &arguments))
+		exit(EXIT_FAILURE);
+
+	if (arguments.sensor_type == SENSOR_NONE) {
+		print_overview();
+		exit(EXIT_SUCCESS);
+	}
+
+	if (arguments.sensor_value < 0) {
+		ret = read_sensor(arguments.sensor_type, arguments.sensor_number, &value);
+		if (ret) {
+			print_error(ret, "Unable to read sensor");
+			exit(EXIT_FAILURE);
+		}
+
+		printf("%d\n", value);
+	} else {
+		ret = write_sensor(arguments.sensor_type, arguments.sensor_number, arguments.sensor_value);
+		if (ret) {
+			print_error(ret, "Unable to write sensor");
+			exit(EXIT_FAILURE);
+		}
+	}
+
+	return 0;
 }
