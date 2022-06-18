@@ -1,2 +1,4 @@
+option('legacy_procfs', type : 'feature', value : 'auto')
+
 option('systemd_support', type : 'feature', value : 'auto')
 option('sysvinit_support', type : 'feature', value : 'auto')
