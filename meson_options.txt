@@ -1,0 +1,2 @@
+option('systemd_support', type : 'feature', value : 'auto')
+option('sysvinit_support', type : 'feature', value : 'auto')
