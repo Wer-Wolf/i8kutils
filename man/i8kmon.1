@@ -52,15 +52,6 @@ Print verbose logs
 \fBset config(timeout)\fR 2
 Timeout. Default is 2.
 .LP
-The following variables set fans speeds. If these variables are set at config
-file, i8kmon will not probe for them. The probe moment turns on fans at max
-speed.
-.TP
-\fBset status(leftspeed)\fR   "0 1000 2000 3000"
-Speed values (rpm) of left fan at velocities 0, 1, 2, 3
-.TP
-\fBset status(rightspeed)\fR   "0 1000 2000 3000"
-Speed values (rpm) of right fan at velocities 0, 1, 2, 3
 .LP
 The daemon defines 4 states (0, 1, 2, 3) with different combinations of fan
 speeds ({0 0}, {1 0}, {1 1},

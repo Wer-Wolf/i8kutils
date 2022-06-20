@@ -29,18 +29,12 @@ array set config {
 }
 
 array set status {
-    leftspeed	{}
-    rightspeed	{}
     nfans	2
     acpi_timer	0
     state	0
     temp	0
     lstate	-2
     rstate	-2
-    lspeed	0
-    rspeed	0
-    lstuck	0
-    rstuck	0
     ac		0
     t_low	0
     t_high	0
@@ -67,16 +61,6 @@ proc i8kfan {{left "-"} {right "-"}} {
 
 proc i8kctl {cmd} {
     switch $cmd {
-        "speed" {
-            if {[catch {exec "i8kctl" "-s" "tacho" "-n" "2"} left]} {
-                set left -1
-            }
-            if {[catch {exec "i8kctl" "-s" "tacho" "-n" "1"} right]} {
-                set right -1
-            }
-
-            return [list $left $right]
-        }
         "temp" {
             if {[catch {exec "i8kctl" "-s" "temp" "-n" "1"} temp]} {
                 return -1;
@@ -160,21 +144,6 @@ proc read_i8k_status {} {
     set state [i8kfan]
     set status(lstate) [lindex $state 0]
     set status(rstate) [lindex $state 1]
-
-    # retrieve probed fans speeds stored on variables and set the correct speed values
-    # using stored values improve performance as it does not requires reading
-    # values all the time from the system, and also from the fact that reading
-    # fan speeds is a slow call that freezes the computer in some Dell laptops models.
-    if {$status(lstate) != -1} {
-	set status(lspeed) [lindex $status(leftspeed) $status(lstate)]
-    } else {
-	set status(lspeed) -1
-    }
-    if {$status(rstate) != -1} {
-	set status(rspeed) [lindex $status(rightspeed) $status(rstate)]
-    } else {
-	set status(rspeed) -1
-    }
 
     read_ac_status
 
@@ -326,40 +295,6 @@ proc parse_options {} {
     }
 }
 
-proc probe_fan_speed {} {
-    global status
-    global config
-
-    if {$status(leftspeed) != {} || $status(rightspeed) != {}} {
-	return
-    }
-
-    i8kfan 1 1
-    after 1000
-    set speeds [i8kctl "speed"]
-    set lspeed1 [lindex $speeds 0]
-    set rspeed1 [lindex $speeds 1]
-
-    i8kfan 2 2
-    after 1000
-    set speeds [i8kctl "speed"]
-    set lspeed2 [lindex $speeds 0]
-    set rspeed2 [lindex $speeds 1]
-
-    i8kfan 3 3
-    after 1000
-    set speeds [i8kctl "speed"]
-    set lspeed3 [lindex $speeds 0]
-    set rspeed3 [lindex $speeds 1]
-
-    set status(leftspeed) "0 $lspeed1 $lspeed2 $lspeed3"
-    set status(rightspeed) "0 $rspeed1 $rspeed2 $rspeed3"
-
-    if {$config(verbose) > 1} {
-	puts "Probed fan speeds are left=$status(leftspeed), right=status(rightspeed)"
-    }
-}
-
 # probe external tools
 proc probe_tools {} {
     # The possibility of choosing 'acpi' or 'acpitool' is for compatibility
@@ -377,7 +312,6 @@ proc main {} {
     global status
 
     read_config
-    probe_fan_speed
     probe_tools
     parse_options
     status_timer
