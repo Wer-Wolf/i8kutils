@@ -17,7 +17,6 @@
 
 array set config {
     sysconfig	/etc/i8kmon.conf
-    acpi    "acpi"
     verbose	0
     timeout	2
     num_configs	5
@@ -160,20 +159,26 @@ proc read_ac_status {} {
 
     # Read ac status once per minute
     if {[incr status(acpi_timer) -1] > 0} {
-	return 1
+        return 1
     }
 
     set status(acpi_timer) [expr 60 / $config(timeout)]
 
-    set acpi_ac [exec {*}$config(acpi)]
-    if {[string match *on-line* $acpi_ac] || [string match *online* $acpi_ac]} {
+    if {[catch {exec "acpi" "-a"} result]} {
+        # Assume AC power when execution fails
+        set status(ac) 1
+
+        return 0
+    }
+
+    if {[string match *on-line* $result]} {
         set status(ac) 1
     } else {
         set status(ac) 0
     }
 
     if {$config(verbose) > 0} {
-        puts "[clock seconds] acpi: $acpi_ac"
+        puts "[clock seconds] acpi status: $result"
     }
 
     return 0
@@ -295,24 +300,10 @@ proc parse_options {} {
     }
 }
 
-# probe external tools
-proc probe_tools {} {
-    # The possibility of choosing 'acpi' or 'acpitool' is for compatibility
-    # between different architectures: amd64, i386, kFreeBSD
-    if {![catch {exec acpi}]} {
-        set config(acpi) "acpi"
-    } elseif {[catch {exec acpitool}]} {
-        set config(acpi) "acpitool"
-    } else {
-        puts stderr "Neither 'acpi' nor 'acpitool' is installed"
-    }
-}
-
 proc main {} {
     global status
 
     read_config
-    probe_tools
     parse_options
     status_timer
 }

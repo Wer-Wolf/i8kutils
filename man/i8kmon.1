@@ -19,6 +19,9 @@ default table of thresholds is as below
 This table can be customized at '/etc/i8kmon.conf', which will be read everytime
 i8kmon service starts.
 .LP
+If the program 'acpi' is not installed or returns an error when executed,
+i8kmon will assume that the machine is running on AC power.
+.LP
 On Debian and derivated OSes, i8kmon starts in the background by default as a service.
 .SH "OPTIONS"
 .LP
@@ -41,10 +44,6 @@ specify their own settings in configuration files /etc/i8kmon.conf and
 that change i8kmon behavior.
 .LP
 The variables and values are as follows.
-.TP
-\fBset config(acpi)\fR    "acpi"
-Filename of the apci executable. i8kmon uses acpi to query whether notebook is
-on-line or on battery.
 .TP
 \fBset config(verbose)\fR 0
 Print verbose logs
