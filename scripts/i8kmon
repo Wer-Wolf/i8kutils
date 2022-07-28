@@ -83,18 +83,6 @@ proc validate_config {} {
             set hi_bt [expr $lo_bt + 5]
         }
 
-	    # set temperature to -1 to lo_ac and lo_bt at config(0)
-	    if {$key == 0} {
-	        set lo_ac -1
-	        set lo_bt -1
-	    }
-
-	    # set temperature to 128 to hi_ac and hi_bt at config(3)
-	    if {$key ==  [expr $config(num_configs)-1] } {
-	        set hi_ac 128
-	        set hi_bt 128
-	    }
-
 	    set config($key) [list $fans $lo_ac $hi_ac $lo_bt $hi_bt]
 
         ${log}::debug "Config $key: battery = $lo_ac - $hi_ac, ac = $lo_ac - $hi_ac"
@@ -142,31 +130,32 @@ proc fan_control {} {
     set index [expr $status(ac) ? 1 : 3]
     set state $status(state)
 
+    ${log}::info "Current state: $state"
+
     if {[catch {get_temp 1} temp]} {
         ${log}::warn "Unable to get temperature"
 
         return
     }
 
-    set t_low [lindex $config($state) $index]
-    set t_high [lindex $config($state) [expr $index+1]]
+    for {} {$state < [expr $config(num_configs) - 1]} {incr state} {
+        set t_high [lindex $config($state) [expr $index + 1]]
 
-    ${log}::debug "Current state $state ($t_low - $t_high)"
+        if {$temp < $t_high} {
+            break
+        }
 
-    while {$temp < 128 && $temp >= $t_high} {
-	    incr state
-	    set t_low  [lindex $config($state) $index]
-	    set t_high [lindex $config($state) [expr $index+1]]
-
-        ${log}::debug "Current state $state ($t_low - $t_high)"
+        ${log}::debug "Temperature above state $state threshold ($t_high)"
     }
 
-    while {$temp > 0 && $temp <= $t_low} {
-	    incr state -1
-	    set t_low  [lindex $config($state) $index]
-	    set t_high [lindex $config($state) [expr $index+1]]
+    for {} {$state > 0} {incr state -1} {
+        set t_low [lindex $config($state) $index]
 
-        ${log}::debug "Current state $state ($t_low - $t_high)"
+        if {$temp > $t_low} {
+            break
+        }
+
+        ${log}::debug "Temperature below state $state threshold ($t_low)"
     }
 
     set status(state) $state
