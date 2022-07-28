@@ -29,7 +29,6 @@ array set config {
 
 array set status {
     nfans	2
-    acpi_timer	0
     state	0
     temp	0
     lstate	-2
@@ -144,8 +143,6 @@ proc read_i8k_status {} {
     set status(lstate) [lindex $state 0]
     set status(rstate) [lindex $state 1]
 
-    read_ac_status
-
     if {$config(verbose) > 0} {
         puts "temp, left fan state, right fan state, ac state: $status(temp) $status(lstate) $status(rstate) $status(ac)"
     }
@@ -153,35 +150,29 @@ proc read_i8k_status {} {
     return 1
 }
 
-proc read_ac_status {} {
+proc ac_status_timer {} {
     global config
     global status
-
-    # Read ac status once per minute
-    if {[incr status(acpi_timer) -1] > 0} {
-        return 1
-    }
-
-    set status(acpi_timer) [expr 60 / $config(timeout)]
 
     if {[catch {exec "acpi" "-a"} result]} {
         # Assume AC power when execution fails
         set status(ac) 1
-
-        return 0
-    }
-
-    if {[string match *on-line* $result]} {
-        set status(ac) 1
     } else {
-        set status(ac) 0
+        if {[string match *on-line* $result]} {
+            set status(ac) 1
+        } else {
+            set status(ac) 0
+        }
     }
 
     if {$config(verbose) > 0} {
         puts "[clock seconds] acpi status: $result"
     }
 
-    return 0
+    # Read AC status once per minute
+    after 60000 ac_status_timer
+
+    return
 }
 
 proc fan_control {} {
@@ -300,15 +291,11 @@ proc parse_options {} {
     }
 }
 
-proc main {} {
-    global status
-
+if {$tcl_interactive == 0} {
     read_config
     parse_options
+    ac_status_timer
     status_timer
-}
 
-if {$tcl_interactive == 0} {
-    main
     vwait forever
 }
