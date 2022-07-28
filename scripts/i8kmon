@@ -21,14 +21,15 @@ set log [logger::init i8kmon]
 ${log}::setlevel notice
 
 array set config {
-    verbose	0
-    timeout	2
-    num_configs	5
-    0		{{0 0}  -1  60  -1  65}
-    1		{{1 0}  50  70  55  75}
-    2		{{1 1}  60  80  65  85}
-    3		{{2 1}  65  85  70  90}
-    4		{{2 2}  70 128  75 128}
+    verbose     0
+    ondemand    0
+    timeout     2
+    num_configs 5
+    0           {{0 0}  -1  60  -1  65}
+    1           {{1 0}  50  70  55  75}
+    2           {{1 1}  60  80  65  85}
+    3           {{2 1}  65  85  70  90}
+    4           {{2 2}  70 128  75 128}
 }
 
 array set status {
@@ -158,9 +159,12 @@ proc fan_control {} {
         ${log}::debug "Temperature below state $state threshold ($t_low)"
     }
 
-    set status(state) $state
+    # When ondemand is set, fan speed updates only happen at status change
+    if {!($state == $status(state) && $config(ondemand) > 0)} {
+        set_fans [lindex $config($state) 0]
+    }
 
-    set_fans [lindex $config($state) 0]
+    set status(state) $state
 }
 
 # The fan state order is reversed (..., fan 3, fan 2, fan 1) due
