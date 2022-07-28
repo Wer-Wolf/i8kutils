@@ -50,15 +50,20 @@ Print verbose logs
 .TP
 \fBset config(timeout)\fR 2
 Timeout. Default is 2.
+.TP
+\fBset config(num_configs)\fR 5
+Number of temperature threshold configurations or 'states'.
 .LP
 .LP
-The daemon defines 4 states (0, 1, 2, 3) with different combinations of fan
-speeds ({0 0}, {1 0}, {1 1},
-{2 2}) and for each state is defined the temperature thresholds which cause
-the fans to switch to a higher or lower state. Each state can have
-different thresholds for operation on ac power or on battery.
+The daemon controls the fans based on 'states' which are defined by
+temperature thresholds which cause the fans to switch to a higher or lower state.
+Each state has an array of associated fan speeds which are applied when
+the state is active.
+Each state can have different thresholds for operation on ac power or on battery.
 For example the following configuration:
 .IP
+set config(num_configs) 4
+.br
 set config(0) {{0 0}  \-1  60  \-1  65}
 .br
 set config(1) {{1 0}  50  70  55  75}
@@ -77,6 +82,11 @@ For better operation the temperature ranges should be overlapping with an
 hysteresis of at least 10 degrees, i.e. 1={50 70},2={60 80} is better than
 1={50 70},2={70 80}. It must be remembered that the low threshold of state 0
 must be \-1 degrees and the high threshold of state 3 must be 128 degrees.
+.LP
+If the laptop support an additional fan, then the speed values for this fan must be
+placed at the start of the fan speed array like this:
+.IP
+set config(2) {{<value> 1 1} 60 80 65 85}
 .LP
 If the laptop has only one fan, it is better to specify a '-' instead of the fan
 speed of the missing fan. For example:

@@ -28,50 +28,27 @@ array set config {
 }
 
 array set status {
-    nfans	2
     state	0
-    temp	0
-    lstate	-2
-    rstate	-2
     ac		0
-    t_low	0
-    t_high	0
 }
 
-proc i8kfan {{left "-"} {right "-"}} {
-    if {$left != "-"} {
-        catch {exec "i8kctl" "-s" "fan" "-n" "2" $left}
-    }
-    if {$right != "-"} {
-        catch {exec "i8kctl" "-s" "fan" "-n" "1" $right}
-    }
+proc get_temp {number} {
+    set temp [exec "i8kctl" "-s" "temp" "-n" $number]
 
-    if {[catch {exec "i8kctl" "-s" "fan" "-n" "2"} new_left]} {
-        set new_left -1
-    }
-
-    if {[catch {exec "i8kctl" "-s" "fan" "-n" "1"} new_right]} {
-        set new_right -1
-    }
-
-    return [list $new_left $new_right]
+    return $temp
 }
 
-proc i8kctl {cmd} {
-    switch $cmd {
-        "temp" {
-            if {[catch {exec "i8kctl" "-s" "temp" "-n" "1"} temp]} {
-                return -1;
-            }
+proc get_fan_state {number} {
+    set state [exec "i8kctl" "-s" "fan" "-n" $number]
 
-            return $temp
-        }
-        default {
-            return [list -1 -1]
-        }
-    }
+    return $state
 }
 
+proc set_fan_state {number state} {
+    exec "i8kctl" "-s" "fan" "-n" $number $state
+
+    return
+}
 
 proc read_config {} {
     global config
@@ -80,74 +57,45 @@ proc read_config {} {
     # read system config file
     if {[file exists $config(sysconfig)]} {
     	source $config(sysconfig)
-	if {$config(verbose) > 0} {
-	    puts "reading system config file"
-	}
+	    if {$config(verbose) > 0} {
+	        puts "reading system config file"
+	    }
     }
 
     for {set key 0}  {$key < $config(num_configs)} {incr key} {
-	set fans  [lindex $config($key) 0]
-	set lo_ac [lindex $config($key) 1]
-	set hi_ac [lindex $config($key) 2]
-	set lo_bt [lindex $config($key) 3]
-	set hi_bt [lindex $config($key) 4]
+        lassign $config($key) fans lo_ac hi_ac lo_bt hi_bt
 
-	# check that for each key hi temp > lo temp
-	if {$lo_ac > $hi_ac} { set hi_ac [expr $lo_ac + 5]}
-	if {$lo_bt > $hi_bt} { set hi_bt [expr $lo_bt + 5]}
+	    # check that for each key hi temp > lo temp
+	    if {$lo_ac > $hi_ac} {
+            set hi_ac [expr $lo_ac + 5]
+        }
+	    if {$lo_bt > $hi_bt} {
+            set hi_bt [expr $lo_bt + 5]
+        }
 
-	# set temperature to -1 to lo_ac and lo_bt at config(0)
-	if {$key == 0} {
-	    set lo_ac -1
-	    set lo_bt -1
-	}
+	    # set temperature to -1 to lo_ac and lo_bt at config(0)
+	    if {$key == 0} {
+	        set lo_ac -1
+	        set lo_bt -1
+	    }
 
-	# set temperature to 128 to hi_ac and hi_bt at config(3)
-	if {$key ==  [expr $config(num_configs)-1] } {
-	    set hi_ac 128
-	    set hi_bt 128
-	}
+	    # set temperature to 128 to hi_ac and hi_bt at config(3)
+	    if {$key ==  [expr $config(num_configs)-1] } {
+	        set hi_ac 128
+	        set hi_bt 128
+	    }
 
-	set config($key) [list $fans $lo_ac $hi_ac $lo_bt $hi_bt]
+	    set config($key) [list $fans $lo_ac $hi_ac $lo_bt $hi_bt]
     }
 }
 
 proc status_timer {} {
     global config
-    global status
 
     # Reschedule status timer
     after [expr $config(timeout)*1000] {status_timer}
 
-    check_status
-}
-
-proc check_status {} {
-    global config
-    global status
-
-    if {![read_i8k_status]} {
-	return
-    }
-
     fan_control
-}
-
-proc read_i8k_status {} {
-    global config
-    global status
-
-    set temp [i8kctl "temp"]
-    set status(temp) $temp
-    set state [i8kfan]
-    set status(lstate) [lindex $state 0]
-    set status(rstate) [lindex $state 1]
-
-    if {$config(verbose) > 0} {
-        puts "temp, left fan state, right fan state, ac state: $status(temp) $status(lstate) $status(rstate) $status(ac)"
-    }
-
-    return 1
 }
 
 proc ac_status_timer {} {
@@ -181,69 +129,78 @@ proc fan_control {} {
 
     set index [expr $status(ac) ? 1 : 3]
     set state $status(state)
-    set temp  $status(temp)
 
-    set status(t_low)  [lindex $config($state) $index]
-    set status(t_high) [lindex $config($state) [expr $index+1]]
+    if {[catch {get_temp 1} temp]} {
+        if {$config(verbose) > 0} {
+            puts "Unable to get temperature"
+        }
 
-    while {$temp < 128 && $temp >= $status(t_high)} {
-	if {$config(verbose) > 0} {
-	    puts -nonewline "# ($temp>=$status(t_high)), "
-	}
-	incr state
-	set status(t_low)  [lindex $config($state) $index]
-	set status(t_high) [lindex $config($state) [expr $index+1]]
-	if {$config(verbose) > 0} {
-	    puts "state=$state, low=$status(t_low), high=$status(t_high)"
-	}
+        return
     }
 
-    while {$temp > 0 && $temp <= $status(t_low)} {
-	if {$config(verbose) > 0} {
-	    puts -nonewline "# ($temp<=$status(t_low)), "
-	}
-	incr state -1
-	set status(t_low)  [lindex $config($state) $index]
-	set status(t_high) [lindex $config($state) [expr $index+1]]
-	if {$config(verbose) > 0} {
-	    puts "state=$state, low=$status(t_low), high=$status(t_high)"
-	}
+    set t_low [lindex $config($state) $index]
+    set t_high [lindex $config($state) [expr $index+1]]
+
+    while {$temp < 128 && $temp >= $t_high} {
+	    if {$config(verbose) > 0} {
+	        puts -nonewline "# ($temp>=$t_high), "
+	    }
+	    incr state
+	    set t_low  [lindex $config($state) $index]
+	    set t_high [lindex $config($state) [expr $index+1]]
+	    if {$config(verbose) > 0} {
+	        puts "state=$state, low=$t_low, high=$t_high"
+	    }
     }
 
-    set_fan $state
-}
-
-proc set_fan {state} {
-    global config
-    global status
+    while {$temp > 0 && $temp <= $t_low} {
+	    if {$config(verbose) > 0} {
+	        puts -nonewline "# ($temp<=$t_low), "
+	    }
+	    incr state -1
+	    set t_low  [lindex $config($state) $index]
+	    set t_high [lindex $config($state) [expr $index+1]]
+	    if {$config(verbose) > 0} {
+	        puts "state=$state, low=$t_low, high=$t_high"
+	    }
+    }
 
     set status(state) $state
-    set args [lindex $config($state) 0]
 
-    set left [lindex $args 0]
-    set right [lindex $args 1]
+    set_fans [lindex $config($state) 0]
+}
 
-    if {$status(lstate) == -1 || $left == $status(lstate)} {
-        set left "-"
-    } else {
-        set status(lstate) $left
+# The fan state order is reversed (..., fan 3, fan 2, fan 1) due
+# to backwards compatibility
+proc set_fans {states} {
+    global config
+    set fan_number 0
+
+    foreach state [lreverse $states] {
+        incr fan_number
+
+        if {$state == "-"} {
+            continue
+        }
+
+        # Only update fan state if current fan state is different
+        if {![catch {get_fan_state $fan_number} current]} {
+            if {$state == $current} {
+                if {$config(verbose > 0} {
+                    puts "Skipping fan number $fan_number"
+                }
+                continue
+            }
+        }
+
+        if {[catch {set_fan_state $fan_number $state}]} {
+            if {$config(verbose) > 0} {
+                puts "Unable to set fan state for fan $fan_number"
+            }
+        }
     }
 
-    if {$status(rstate) == -1 || $right == $status(rstate)} {
-        set right "-"
-    } else {
-        set status(rstate) $right
-    }
-
-    if {$status(nfans) < 2} { set right "-" }
-
-    if {$left == "-" && $right == "-"} {return}
-    
-    if {$config(verbose) > 0} {
-        puts "i8kfan $left $right"
-    }
-
-    i8kfan $left $right
+    return
 }
 
 proc usage {} {
