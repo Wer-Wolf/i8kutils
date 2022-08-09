@@ -1,4 +1,4 @@
-.TH i8kmon 1 "04 Mar 2017" "Vitor Augusto" Utilities
+.TH I8KMON 1 "15 Aug 2022" "Vitor Augusto" Utilities
 .SH "NAME"
 i8kmon \- temperature monitor
 .SH "SYNOPSIS"
@@ -38,23 +38,24 @@ seconds. Default is 2 seconds.
 .SH "CONFIGURATION"
 .LP
 As said before, i8kmon has builtin default values of temperature thresholds. If
-users need, they can
-specify their own settings in configuration files /etc/i8kmon.conf and
-~/.i8kmon. It is also possible to specify values to others variables
+necessary, they can be changed inside the configuration file /etc/i8kmon.conf.
+It is also possible to specify the values of other variables
 that change i8kmon behavior.
 .LP
-The variables and values are as follows.
+The variables and values are as follows:
 .TP
 \fBset config(verbose)\fR 0
-Print verbose logs
+Print verbose logs, disabled by default.
 .TP
 \fBset config(ondemand)\fR 0
 Only update fan speed when thresholds where exceeded.
 Useful when updating the fan speed takes too much time
 and causes stutter and lags.
+Since some machines need periodic fan speed updates,
+this option is disabled by default.
 .TP
 \fBset config(timeout)\fR 2
-Timeout. Default is 2.
+Timeout, default is 2.
 .TP
 \fBset config(num_configs)\fR 5
 Number of temperature threshold configurations or 'states'.
@@ -85,8 +86,7 @@ threshold of 50 degrees. If on ac power the temperature drops below 50 the progr
 switch back to state 0, if it rises above 70 it will enter state 2, and so on.
 For better operation the temperature ranges should be overlapping with an
 hysteresis of at least 10 degrees, i.e. 1={50 70},2={60 80} is better than
-1={50 70},2={70 80}. It must be remembered that the low threshold of state 0
-must be \-1 degrees and the high threshold of state 3 must be 128 degrees.
+1={50 70},2={70 80}.
 .LP
 If the laptop support an additional fan, then the speed values for this fan must be
 placed at the start of the fan speed array like this:
@@ -102,6 +102,8 @@ set config(2) {{1 -}  60  80  65  85}
 \fI/etc/i8kmon.conf\fP
 .SH "AUTHORS"
 .LP
+Armin Wolf <W_Armin@gmx.de>
+.br
 Vitor Augusto <vitorafsr@gmail.com>
 .br
 Massimo Dal Zotto <dz@debian.org>
