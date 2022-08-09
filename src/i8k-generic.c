@@ -36,7 +36,9 @@ int strtoi(const char *str, int *value)
 
 int itostr(const int value, char *str, size_t length)
 {
-	if (snprintf(str, length, "%d", value) != length)
+	int ret = snprintf(str, length, "%d", value);
+
+	if (ret < 0 || ret >= length)
 		return EINVAL;
 
 	return 0;
