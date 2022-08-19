@@ -1,4 +1,4 @@
-project('i8kutils', 'c', license : 'GPL-3.0-or-later', version : '1.43', meson_version : '>=0.59.0')
+project('i8kutils', 'c', license : 'GPL-3.0-or-later', version : '1.44', meson_version : '>=0.59.0')
 
 incdir = include_directories('include')
 
