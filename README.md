@@ -176,7 +176,7 @@ The `sensors` utility from lm-sensors provides similar data.
 PREREQUISITE
 ============
 
-The i8kmon depends on Tcl and the logger module in tcllib, which may not
+i8kutils depends on Tcl and the logger module in tcllib, which may not
 installed by default on your system.
 You can install them depending on your distro.
 
