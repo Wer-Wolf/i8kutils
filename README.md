@@ -125,7 +125,7 @@ The driver accepts the following parameters:
       for buggy hardware, use only when ignore_dmi=1 is not enough
 
 * restricted=1
-    * allows privileged programs to change fan speed
+    * allows unprivileged programs to change fan speed
     * **do not use, since it allows malicous programs to damage your hardware
       by disabling fan control**
 
