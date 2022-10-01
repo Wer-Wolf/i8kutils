@@ -173,6 +173,29 @@ of the items and to control the fan status.
 The `sensors` utility from lm-sensors provides similar data.
 
 
+PREREQUISITE
+============
+
+i8kutils depends on Tcl and the logger module in tcllib, which may not
+installed by default on your system.
+You can install them depending on your distro.
+
+Ubuntu
+
+    sudo apt install tcl
+    sudo apt install tcllib
+
+Arch Linux
+
+    sudo pacman -S tcl
+    sudo pacman -S tcllib
+
+Gentoo
+
+    sudo emerge --ask dev-lang/tcl
+    sudo emerge --ask dev-tcltk/tcllib
+
+
 COMPILATION
 ===========
 
