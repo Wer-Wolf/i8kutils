@@ -4,5 +4,6 @@ incdir = include_directories('include')
 
 subdir('src')
 subdir('scripts')
+subdir('modules')
 subdir('etc')
 subdir('man')

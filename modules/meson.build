@@ -1,0 +1,1 @@
+install_subdir('i8k', install_dir : get_option('moduledir'), install_mode : ['rw-r--r--', 'root', 'root'])
