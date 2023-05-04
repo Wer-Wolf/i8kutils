@@ -38,19 +38,27 @@ array set status {
 }
 
 proc get_temp {number} {
-    set temp [exec "i8kctl" "-s" "temp" "-n" $number]
+    set output [exec "i8kctl" "temp$number"]
+
+    if {[regexp {^temperature \d+: (\d+) °C$} $output dummy temp] == 0} {
+        error "unable to read temperature"
+    }
 
     return $temp
 }
 
 proc get_fan_state {number} {
-    set state [exec "i8kctl" "-s" "fan" "-n" $number]
+    set output [exec "i8kctl" "fan$number"]
+
+    if {[regexp {^fan \d+ state: (\d+)$} $output dummy state] == 0} {
+        error "unable to read fan"
+    }
 
     return $state
 }
 
 proc set_fan_state {number state} {
-    exec "i8kctl" "-s" "fan" "-n" $number $state
+    exec "i8kctl" "fan$number" $state
 
     return
 }

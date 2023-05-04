@@ -1,0 +1,223 @@
+#!/usr/bin/env tclsh
+#
+# i8kctl -- Utitlity to read/write sensors.
+#
+# Copyright (C) 2023        Armin Wolf <W_Armin@gmx.de>
+# Copyright (C) 2013-2017   Vitor Augusto <vitorafsr@gmail.com>
+# Copyright (C) 2001-2005   Massimo Dal Zotto <dz@debian.org>
+#
+# This program is free software; you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by the
+# Free Software Foundation; either version 2, or (at your option) any
+# later version.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# General Public License for more details.
+
+package require Tcl 8.6
+package require cmdline 1.5
+package require defer
+package require generator
+
+package require i8k::thermal
+package require i8k::hwmon
+
+proc printFan {fan} {
+    set index [$fan getIndex]
+
+    try {
+        set state [$fan getState]
+
+        puts "fan $index state: $state"
+    } trap {POSIX} {msg} {
+        throw {I8KCTL ERROR} "unable to read fan $index: $msg"
+    }
+
+    return
+}
+
+proc printTemp {temp} {
+    set index [$temp getIndex]
+
+    try {
+        set temperature [expr [$temp getTemperature] / 1000]
+
+        puts "temperature $index: $temperature °C"
+    } trap {POSIX} {msg} {
+        throw {I8KCTL ERROR} "unable the read temperature sensor $index: $msg"
+    }
+
+    return
+}
+
+generator define filterFans {fans number} {
+    generator::finally generator destroy $fans
+
+    generator foreach fan $fans {
+        if {[$fan getIndex] == $number} {
+            generator::yield $fan
+            break
+        }
+
+        $fan destroy
+    }
+
+    return
+}
+
+proc sensorsSort {first second} {
+    set firstIndex [$first getIndex]
+    set secondIndex [$second getIndex]
+
+    if {$firstIndex > $secondIndex} {
+        return 1
+    } elseif {$firstIndex < $secondIndex} {
+        return -1
+    }
+
+    return 0
+}
+
+proc sensorOverview {} {
+    set fans {}
+    set temps {}
+
+    try {
+        set chip [hwmon::detectChip]
+    } trap {} {msg} {
+        throw {I8KCTL ERROR} "unable to find hwmon chip: $msg"
+    }
+
+    generator foreach fan [thermal::detectFans] {
+        defer::with {fan} {
+            $fan destroy
+        }
+
+        lappend fans [list $fan]
+    }
+
+    foreach fan [lsort -command sensorsSort $fans] {
+        printFan $fan
+    }
+
+    generator foreach temp [hwmon::detectSensors $chip] {
+        defer::with {temp} {
+            $temp destroy
+        }
+
+        lappend temps [list $temp]
+    }
+
+    foreach temp [lsort -command sensorsSort $temps] {
+        printTemp $temp
+    }
+
+    return
+}
+
+proc sensorRead {sensorType sensorNumber} {
+    switch $sensorType {
+        "fan" {
+            generator foreach fan [filterFans [thermal::detectFans] $sensorNumber] {
+                try {
+                    printFan $fan
+                } finally {
+                    $fan destroy
+                }
+
+                return
+            }
+
+            throw {I8KCTL ERROR} "fan $sensorNumber not found"
+        }
+        "temp" {
+            try {
+                set chip [hwmon::detectChip]
+                set temp [hwmon::getSensor $chip $sensorNumber]
+            } trap {} {msg} {
+                throw {I8KCTL ERROR} "temperature sensor $sensorNumber not found: $msg"
+            }
+
+            defer::defer $temp destroy
+            printTemp $temp
+
+            return
+        }
+        default {
+            throw {I8KCTL ERROR} "unknown sensor type $sensorType"
+        }
+    }
+
+    return
+}
+
+proc sensorWrite {sensorType sensorNumber value} {
+    switch $sensorType {
+        "fan" {
+            generator foreach fan [filterFans [thermal::detectFans] $sensorNumber] {
+                try {
+                    $fan setState $value
+                } trap {} {msg} {
+                    throw {I8KCTL ERROR} "unable to write fan $sensorNumber: $msg"
+                } finally {
+                    $fan destroy
+                }
+
+                return
+            }
+
+            throw {I8KCTL ERROR} "fan $sensorNumber not found"
+        }
+        "temp" {
+            throw {I8KCTL ERROR} "writing temperature sensors is not supported"
+        }
+        default {
+            throw {I8KCTL ERROR} "unknown sensor type $sensorType"
+        }
+    }
+
+    return
+}
+
+proc parseSensorName {sensorName} {
+    if {[regexp {^([a-z]+)(\d+)$} $sensorName dummy sensor number] == 0} {
+        throw {I8KCTL ERROR} "invalid sensor name $sensorName"
+    }
+
+    return [list $sensor $number]
+}
+
+proc main {args} {
+    set usage "options ?sensor? ?value?:"
+    set options {}
+
+    try {
+        array set params [cmdline::getoptions args $options $usage]
+        switch [llength $::argv] {
+            0 {
+                sensorOverview
+            }
+            1 {
+                sensorRead {*}[parseSensorName [lindex $args 0]]
+            }
+            2 {
+                sensorWrite {*}[parseSensorName [lindex $args 0]] [lindex $args 1]
+            }
+            default {
+                throw {CMDLINE USAGE} [cmdline::usage $options $usage]
+            }
+        }
+    } trap {I8KCTL ERROR} {msg} {
+        puts stderr "i8kctl: $msg"
+        exit 1
+    } trap {CMDLINE USAGE} {msg} {
+        puts $msg
+        exit 1
+    }
+
+    return
+}
+
+main {*}$argv

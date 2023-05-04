@@ -1,15 +1,15 @@
-.TH I8KCTL 1 2022-05-22 "Armin Wolf" Documentation
+.TH I8KCTL 1 2023-05-06 "Armin Wolf" Documentation
 
 .SH NAME
 i8kctl \- Utility for fan control on Dell notebooks
 
 .SH SYNOPSIS
-.B i8kctl
+.B i8kctl [
+.I options
+.B ]
 .br
-.B i8kctl -s [
-.I type
-.B ] -n [
-.I number
+.B i8kctl [
+.I sensor
 .B ] [
 .I state
 .B ]
@@ -22,35 +22,23 @@ where it depends on the dell-smm-hwmon kernel module for hardware access.
 When invoked without arguments it lists all available sensors and
 their values.
 .LP
-When both options '-s' and '-n' specify a valid sensor, its reading is displayed
-or its value is set to 'state' if specified.
+If 'sensor' is specified and contains a valid sensor name, its reading is being displayed.
+Valid sensor names are 'fan[number]' for fan sensors (fan1, fan2, ...) and 'temp[number]' for
+temperature sensors (temp1, temp2, ...). If 'state' is also specified, the value of the sensor
+is being set to 'state'.
 
 .SH OPTIONS
-.IP "-s, --sensor-type"
-Specify type of sensor to read/write.
-Can be 'fan', 'tacho' or 'temp'.
-
-.IP "-n, --sensor-number"
-Specify number of sensor to read/write.
-Must be creater or equal than 1.
-
-.IP "-v, --verbose"
-Display verbose information, used e.g. for debugging.
-
-.IP "-?, --help"
-Display help list.
-
-.IP "-V, --version"
-Display program version.
+.IP "-?, -help"
+Display usage information.
 
 .SH VERSION
 .B i8kctl
-needs at least linux kernel 3.0 to display "tacho" and "temp" sensors
-and at least linux kernel 5.19 or CONFIG_I8K enabled to display "fan" sensors.
+needs at least linux kernel 3.0 to display temperature sensors and at
+least linux kernel 5.19 to display fan sensors.
 
 .SH NOTES
 .B i8kctl
-depends on the precense of the dell_smm_hwmon kernel module. If the module
+depends on the presense of the dell_smm_hwmon kernel module. If the module
 is missing, all attemps to read/write sensors will fail. If the module is not
 automatically loaded on your machine, then you can load it with:
 .LP
@@ -75,13 +63,13 @@ To set the fan state of the first fan  to '1', execute:
 .LP
 .in +4n
 .EX
-i8kctl -s fan -n 1 1
+i8kctl fan1 1
 .EE
 .in
 
 .SH AUTHORS
 .LP
-2022 Armin Wolf <W_Armin@gmx.de>
+2022-2023 Armin Wolf <W_Armin@gmx.de>
 .br
 2013-2017 Vitor Augusto <vitorafsr@gmail.com>
 .br
