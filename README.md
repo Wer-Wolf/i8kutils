@@ -17,32 +17,22 @@ OVERVIEW
 
 i8kutils is a collection of utilities for controlling the fans on some Dell
 laptops. The utilities are entirely built upon the `dell-smm-hwmon` kernel
-module.
+module, which has to be loaded before they can work.
 
 The i8kutils package includes the following utilities:
 
 * i8kctl, a command-line utility for interfacing with the kernel module.
 * i8kmon, a temperature monitor with fan control capability.
-* i8kfan, a utility to set the state (speed) of fans.
 
 Since 2011 (kernel version 3.0), the kernel module exports temperature and
 fan data over the standard linux hwmon interface. If you are running a recent
 enough kernel, you might want to take a look at the [lm-sensors project](https://github.com/lm-sensors/lm-sensors).
+In order to access fan sensors using i8kctl, kernel version 5.19 or greater
+is required.
 
-The i8kctl perform queries and sets related to fan control as
-read temperature, turn the fan on. The i8kmon continuously monitor the
-system temperature and control automatically the fans.
-
-All Dell laptop has the feature of controlling the temperature in the BIOS, but
-to some models this feature does not work properly. i8kmon does essentially the same
-job as the BIOS is supposed to do.
-
-The latest version of the i8kutils package can be retrieved at:
-
-    https://launchpad.net/i8kutils
-
-The module is supposed to be loaded in the system to i8kmon service starts.
-
+All Dell laptops handle fan control through the BIOS, but on some models this
+feature does not work properly. i8kmon does essentially the same job as the
+BIOS is supposed to do.
 
 LICENCE
 =======
@@ -73,44 +63,6 @@ Public License can be found in `/usr/share/common-licenses/GPL'.
 THE KERNEL MODULE
 =================
 
-The information provided by the kernel module can be accessed by simply
-reading the /proc/i8k file. For example:
-
-    $ cat /proc/i8k
-    1.0 A17 2J59L02 52 2 1 8040 6420 1 2
-
-The fields read from /proc/i8k are:
-
-    1.0 A17 2J59L02 52 2 1 8040 6420 1 2
-    |   |   |       |  | | |    |    | |
-    |   |   |       |  | | |    |    | +------- 10. buttons status
-    |   |   |       |  | | |    |    +--------- 9.  ac status
-    |   |   |       |  | | |    +-------------- 8.  right fan rpm
-    |   |   |       |  | | +------------------- 7.  left fan rpm
-    |   |   |       |  | +--------------------- 6.  right fan status
-    |   |   |       |  +----------------------- 5.  left fan status
-    |   |   |       +-------------------------- 4.  CPU temperature (Celsius)
-    |   |   +---------------------------------- 3.  Dell service tag (later known as 'serial number')
-    |   +-------------------------------------- 2.  BIOS version
-    +------------------------------------------ 1.  /proc/i8k format version
-
-A negative value, for example -22, indicates that the BIOS doesn't return
-the corresponding information. This is normal on some models/bioses.
-
-For performance reasons the /proc/i8k doesn't report by default the ac status
-since this SMM call takes a long time to execute and is not really needed.
-If you want to see the ac status in /proc/i8k you must explictitly enable
-this option by passing the "power_status=1" parameter to insmod. If ac status
-is not available -1 is printed instead.
-
-The driver provides also an ioctl interface which can be used to obtain the
-same information and to control the fan status. The ioctl interface can be
-accessed from C programs or from shell using the i8kctl utility. See the
-source file i8kctl.c for more information on how to use the ioctl interface.
-
-If the /proc/i8k file does not exist, then check wether the kernel module
-is loaded and the kernel has the config option `CONFIG_I8K` enabled.
-
 The documentation of the `dell_smm_hwmon` kernel driver can be found
 [here](https://www.kernel.org/doc/html/latest/hwmon/dell-smm-hwmon.html).
 
@@ -123,14 +75,6 @@ The driver accepts the following parameters:
     * forces the driver to load on unsupported/buggy hardware
     * might cause problems since it also disables all blacklists
       for buggy hardware, use only when ignore_dmi=1 is not enough
-
-* restricted=1
-    * allows unprivileged programs to change fan speed
-    * **do not use, since it allows malicous programs to damage your hardware
-      by disabling fan control**
-
-* power_status=1
-    * report ac status in /proc/i8k
 
 * fan_mult=<int>
     * overrides the fan speed multiplicator
@@ -155,15 +99,15 @@ Any module parameters must be specified in /etc/modprobe.d/dell-smm-hwmon.conf.
 To force dell-smm-hwmon to load on unknown hardware, the above file should
 contain the following line:
 
-    options dell-smm-hwmon force=1
+    options dell-smm-hwmon ignore_dmi=1
 
 
 THE I8KCTL UTILITY
 ==================
 
 The i8kctl utility provides a command-line interface to the `dell-smm-hwmon` kernel driver.
-When invoked without arguments the program reports the same information which
-can be read from the /proc/i8k file.
+When invoked without arguments the program reports the readings of all fan and temperature
+sensors exposed by the driver.
 
 In order to modify fan speeds, the utility requires root privileges.
 
@@ -196,14 +140,13 @@ Gentoo
     sudo emerge --ask dev-tcltk/tcllib
 
 
-COMPILATION
-===========
+BUILDING
+========
 
-To compile the programs type the following commands:
+To build the programs type the following commands:
 
     meson build --prefix="/usr"
     cd build
-    meson compile
 
 
 INSTALLATION
@@ -215,8 +158,7 @@ To install i8kutils, type the following commands:
 
 You must then manually install the provided init scripts if necessary.
 For enabling i8kmon to read the battery status, you must also install
-'acpitool' or 'acpi', otherwise i8kmon will assume that it always
-runs on ac power.
+'acpi', otherwise i8kmon will assume that it always runs on ac power.
 
 CONTRIBUTORS
 ============
