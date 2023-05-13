@@ -2,8 +2,9 @@
 #
 # i8kmon -- Monitor the temperature on Dell laptops.
 #
-# Copyright (C) 2013-2017  Vitor Augusto <vitorafsr@gmail.com>
-# Copyright (C) 2001-2005  Massimo Dal Zotto <dz@debian.org>
+# Copyright (C) 2023        Armin Wolf <W_Armin@gmx.de>
+# Copyright (C) 2013-2017   Vitor Augusto <vitorafsr@gmail.com>
+# Copyright (C) 2001-2005   Massimo Dal Zotto <dz@debian.org>
 #
 # This program is free software; you can redistribute it and/or modify it
 # under the terms of the GNU General Public License as published by the
@@ -17,224 +18,247 @@
 
 package require Tcl 8.6
 package require cmdline 1.5
+package require coroutine
+package require defer
+package require generator
 package require logger
 
-set log [logger::init i8kmon]
-${log}::setlevel notice
+package require i8k::thermal
+package require i8k::hwmon
 
-array set config {
-    verbose     0
-    ondemand    0
-    timeout     2
-    num_configs 5
-    0           {{0 0}  -1  60  -1  65}
-    1           {{1 0}  50  70  55  75}
-    2           {{1 1}  60  80  65  85}
-    3           {{2 1}  65  85  70  90}
-    4           {{2 2}  70 128  75 128}
-}
+set onAcPower 0
+set error ""
 
-array set status {
-    state	0
-    ac		0
-}
+# The fan state order is reversed (..., fan 3, fan 2, fan 1) due
+# to backwards compatibility
+proc setFans {fans fanStates log} {
+    set fanNumber 0
 
-proc get_temp {number} {
-    set output [exec "i8kctl" "temp$number"]
+    foreach fanState [lreverse $fanStates] {
+        incr fanNumber
 
-    if {[regexp {^temperature \d+: (\d+) °C$} $output dummy temp] == 0} {
-        error "unable to read temperature"
+        if {$fanState == "-"} {
+            continue
+        }
+
+        if {[dict exists $fans $fanNumber]} {
+            set fan [dict get $fans $fanNumber]
+
+            $fan setState $fanState
+        } else {
+            ${log}::info "fan $fanNumber not found"
+        }
     }
-
-    return $temp
-}
-
-proc get_fan_state {number} {
-    set output [exec "i8kctl" "fan$number"]
-
-    if {[regexp {^fan \d+ state: (\d+)$} $output dummy state] == 0} {
-        error "unable to read fan"
-    }
-
-    return $state
-}
-
-proc set_fan_state {number state} {
-    exec "i8kctl" "fan$number" $state
 
     return
 }
 
-proc read_config {path} {
-    global config
+proc fanControl {config fans temp log} {
+    global onAcPower
+
+    # Force initial fan speed update when ondemand is set
+    set previousState -1
+    set currentState 0
+
+    while {1} {
+        set index [expr {$onAcPower ? 1 : 3}]
+
+        try {
+            set temperature [expr {[$temp getTemperature] / 1000}]
+
+            ${log}::debug "temperature: $temperature °C"
+
+            for {} {$currentState < [expr {[dict get $config num_configs] - 1}]} {incr currentState} {
+                set temperatureHigh [lindex [dict get $config $currentState] [expr $index + 1]]
+
+                if {$temperature < $temperatureHigh} {
+                    break
+                }
+
+                ${log}::debug "temperature above state $currentState threshold ($temperatureHigh °C)"
+            }
+
+            for {} {$currentState > 0} {incr currentState -1} {
+                set temperatureLow [lindex [dict get $config $currentState] $index]
+
+                if {$temperature > $temperatureLow} {
+                    break
+                }
+
+                ${log}::debug "temperature below state $currentState threshold ($temperatureLow °C)"
+            }
+
+            # When ondemand is set, fan speed updates only happen at state change
+            if {$currentState == $previousState && [dict get $config ondemand] > 0} {
+                ${log}::debug "skipping fan speed update for state $currentState"
+            } else {
+                try {
+                    setFans $fans [lindex [dict get $config $currentState] 0] $log
+                    set previousState $currentState
+                    ${log}::debug "switched to state $currentState"
+                } trap {POSIX} {msg} {
+                    ${log}::warn "unable to update fan speed: $msg"
+                    # Force fan speed update on next iteration
+                    set previousState -1
+                }
+            }
+        } trap {POSIX} {msg} {
+            ${log}::warn "unable to read temperature: $msg"
+        }
+
+        coroutine::util after [expr {[dict get $config timeout] * 1000}]
+    }
+
+    return
+}
+
+proc updatePowerStatus {log} {
+    global onAcPower
+
+    while {1} {
+        if {[catch {exec "acpi" "-a"} result]} {
+            # Assume AC power when execution fails
+            ${log}::info "power status: assuming ac power"
+            set onAcPower 1
+        } else {
+            if {[string match *on-line* $result]} {
+                ${log}::info "power status: running on ac power ($result)"
+                set onAcPower 1
+            } else {
+                ${log}::info "power status: running on battery power ($result)"
+                set onAcPower 0
+            }
+        }
+
+        # Read AC status once per minute
+        coroutine::util after 60000
+    }
+
+    return
+}
+
+# Gets called by tcl when a coroutine dies
+proc bgerror {msg} {
+    global error
+
+    set error $msg
+}
+
+proc readConfig {path} {
+    array set config {
+        verbose     0
+        ondemand    0
+        timeout     2
+        num_configs 5
+        0           {{0 0}  -1  50  -1  50}
+        1           {{0 1}  45  55  45  55}
+        2           {{1 1}  50  65  50  65}
+        3           {{1 2}  60  70  60  70}
+        4           {{2 2}  65 128  65 128}
+    }
 
     if {[file exists $path]} {
         source $path
     }
 
-    return
+    return [array get config]
 }
 
-proc validate_config {} {
-    global config
-    global log
+proc parseOptions {configName args} {
+    upvar $configName config
 
-    if {$config(verbose) > 0} {
-        ${log}::setlevel debug
-    }
-
-    for {set key 0}  {$key < $config(num_configs)} {incr key} {
-        lassign $config($key) fans lo_ac hi_ac lo_bt hi_bt
-
-	    # check that for each key hi temp > lo temp
-	    if {$lo_ac > $hi_ac} {
-            set hi_ac [expr $lo_ac + 5]
-        }
-	    if {$lo_bt > $hi_bt} {
-            set hi_bt [expr $lo_bt + 5]
-        }
-
-	    set config($key) [list $fans $lo_ac $hi_ac $lo_bt $hi_bt]
-
-        ${log}::debug "Config $key: battery = $lo_ac - $hi_ac, ac = $lo_ac - $hi_ac"
-    }
-}
-
-proc status_timer {} {
-    global config
-
-    # Reschedule status timer
-    after [expr $config(timeout)*1000] {status_timer}
-
-    fan_control
-}
-
-proc ac_status_timer {} {
-    global config
-    global status
-    global log
-
-    if {[catch {exec "acpi" "-a"} result]} {
-        # Assume AC power when execution fails
-        set status(ac) 1
-    } else {
-        if {[string match *on-line* $result]} {
-            set status(ac) 1
-        } else {
-            set status(ac) 0
-        }
-    }
-
-    ${log}::info "ac status: $status(ac) ($result)"
-
-    # Read AC status once per minute
-    after 60000 ac_status_timer
-
-    return
-}
-
-proc fan_control {} {
-    global config
-    global status
-    global log
-
-    set index [expr $status(ac) ? 1 : 3]
-    set state $status(state)
-
-    ${log}::info "Current state: $state"
-
-    if {[catch {get_temp 1} temp]} {
-        ${log}::warn "Unable to get temperature"
-
-        return
-    }
-
-    for {} {$state < [expr $config(num_configs) - 1]} {incr state} {
-        set t_high [lindex $config($state) [expr $index + 1]]
-
-        if {$temp < $t_high} {
-            break
-        }
-
-        ${log}::debug "Temperature above state $state threshold ($t_high)"
-    }
-
-    for {} {$state > 0} {incr state -1} {
-        set t_low [lindex $config($state) $index]
-
-        if {$temp > $t_low} {
-            break
-        }
-
-        ${log}::debug "Temperature below state $state threshold ($t_low)"
-    }
-
-    # When ondemand is set, fan speed updates only happen at status change
-    if {!($state == $status(state) && $config(ondemand) > 0)} {
-        set_fans [lindex $config($state) 0]
-    }
-
-    set status(state) $state
-}
-
-# The fan state order is reversed (..., fan 3, fan 2, fan 1) due
-# to backwards compatibility
-proc set_fans {states} {
-    global log
-
-    set fan_number 0
-
-    foreach state [lreverse $states] {
-        incr fan_number
-
-        if {$state == "-"} {
-            continue
-        }
-
-        # Only update fan state if current fan state is different
-        if {![catch {get_fan_state $fan_number} current]} {
-            if {$state == $current} {
-                ${log}::info "Skipping fan number $fan_number"
-                continue
-            }
-        }
-
-        if {[catch {set_fan_state $fan_number $state}]} {
-            ${log}::warn "Unable to set fan state for fan number $fan_number"
-        }
-    }
-
-    return
-}
-
-proc parse_options {args} {
-    global config
-    global status
-
-    set timeout [list "t.arg" $config(timeout) "Interval for checking hardware status in seconds"]
+    set timeout [list "t.arg" [dict get $config timeout] "Interval for checking hardware status in seconds"]
     set verbose [list "v" "Report verbose information"]
     set options [list $timeout $verbose]
 
-    try {
-        array set params [cmdline::getoptions args $options]
+    array set params [cmdline::getoptions args $options]
 
-        if {$params(v)} {
-            set config(verbose) 1
+    if {$params(v)} {
+        dict set config verbose 1
+    }
+
+    dict set config timeout $params(t)
+
+    return
+}
+
+proc validateConfig {configName log} {
+    upvar $configName config
+
+    if {[dict get $config verbose] > 0} {
+        ${log}::setlevel debug
+    }
+
+    for {set index 0}  {$index < [dict get $config num_configs]} {incr index} {
+        lassign [dict get $config $index] fans lowAc highAc lowBat highBat
+
+	    # check that for each key high temp > low temp
+	    if {$lowAc > $highAc} {
+            ${log}::notice "config entry $index: high temperature $highAc °C is lower or equals low temperature $lowAc °C (ac)"
+            set highAc [expr {$lowAc + 5}]
+        }
+	    if {$lowBat > $highBat} {
+            ${log}::notice "config entry $index: high temperature $highBat °C is lower or equals low temperature $lowBat °C (battery)"
+            set highBat [expr {$lowBat + 5}]
         }
 
-        set config(timeout) $params(t)
+	    dict set config $index [list $fans $lowAc $highAc $lowBat $highBat]
+
+        ${log}::debug "config entry $index: battery = $lowBat °C - $highBat °C, ac = $lowAc °C - $highAc °C"
+    }
+}
+
+proc main {args path} {
+    global error
+
+    set config [dict create {*}[readConfig $path]]
+    set fans [dict create]
+    set log [logger::init i8kmon]
+
+    defer::defer ${log}::delete
+    ${log}::setlevel notice
+
+    parseOptions config {*}$args
+    validateConfig config $log
+
+    try {
+        set hwmonChip [hwmon::detectChip]
+        set temp [hwmon::getSensor $hwmonChip 1]
+    } trap {} {msg} {
+        throw {I8KMON ERROR} "temperature sensor not found: $msg"
+    }
+
+    defer::defer $temp destroy
+
+    generator foreach fan [thermal::detectFans] {
+        defer::with {fan} {
+            $fan destroy
+        }
+
+        dict set fans [$fan getIndex] $fan
+    }
+
+    if {[dict size $fans] == 0} {
+        throw {I8KMON ERROR} "no fans detected"
+    }
+
+    # Start updatePowerStatus first to ensure onAcStatus is valid
+    coroutine::util create updatePowerStatus $log
+    coroutine::util create fanControl $config $fans $temp $log
+
+    vwait error
+
+    throw {I8KMON ERROR} "background error: $error"
+}
+
+if {$tcl_interactive == 0} {
+    try {
+        main $argv "/etc/i8kmon.conf"
+    } trap {I8KMON ERROR} {msg} {
+        puts stderr "i8kmon: $msg"
+        exit 1
     } trap {CMDLINE USAGE} {msg} {
         puts $msg
         exit 1
     }
-}
-
-if {$tcl_interactive == 0} {
-    read_config "/etc/i8kmon.conf"
-    parse_options {*}$argv
-    validate_config
-    ac_status_timer
-    status_timer
-
-    vwait forever
 }
