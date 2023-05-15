@@ -231,6 +231,12 @@ proc main {args path} {
     defer::defer $temp destroy
 
     generator foreach fan [thermal::detectFans] {
+        if {![$fan isSetable]} {
+            $fan destroy
+
+            continue
+        }
+
         defer::with {fan} {
             $fan destroy
         }
@@ -239,7 +245,7 @@ proc main {args path} {
     }
 
     if {[dict size $fans] == 0} {
-        throw {I8KMON ERROR} "no fans detected"
+        throw {I8KMON ERROR} "no controllable fans detected"
     }
 
     # Start updatePowerStatus first to ensure onAcStatus is valid
