@@ -175,10 +175,15 @@ proc parseOptions {configName args} {
     upvar $configName config
 
     set timeout [list "t.arg" [dict get $config timeout] "Interval for checking hardware status in seconds"]
+    set ondemand [list "o" "Only update fan speed when thresholds where exceeded"]
     set verbose [list "v" "Report verbose information"]
-    set options [list $timeout $verbose]
+    set options [list $timeout $ondemand $verbose]
 
     array set params [cmdline::getoptions args $options]
+
+    if {$params(o)} {
+        dict set config ondemand 1
+    }
 
     if {$params(v)} {
         dict set config verbose 1
