@@ -20,6 +20,7 @@ package require Tcl 8.6
 package require cmdline 1.5
 package require coroutine
 package require defer
+package require fileutil
 package require generator
 package require logger
 
@@ -165,7 +166,20 @@ proc readConfig {path} {
     }
 
     if {[file exists $path]} {
-        source $path
+        try {
+            set configContent [fileutil::cat $path]
+            set defaultConfig [array get config]
+            set safeInterp [interp create -safe]
+
+            defer::defer interp delete $safeInterp
+
+            $safeInterp eval array set config \{ {*}$defaultConfig \}
+            $safeInterp eval $configContent
+
+            return [$safeInterp eval {array get config}]
+        } trap {} {msg} {
+            throw {I8KMON ERROR} "unable to read config: $msg"
+        }
     }
 
     return [array get config]
