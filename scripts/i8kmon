@@ -44,7 +44,14 @@ proc setFans {fans fanStates log} {
         if {[dict exists $fans $fanNumber]} {
             set fan [dict get $fans $fanNumber]
 
-            $fan setState $fanState
+            try {
+                $fan setState $fanState
+            } trap {FAN {invalid state}} {} {
+                set maxState [$fan getMaxState]
+
+                ${log}::notice "fan $fanNumber does not support fan state $fanState, using max. fan state $maxState"
+                $fan setState $maxState
+            }
         } else {
             ${log}::info "fan $fanNumber not found"
         }
