@@ -55,6 +55,14 @@ namespace eval thermal {
             return
         }
 
+        method isSetable {} {
+            return [expr {[chan pending output $channel] != -1}]
+        }
+
+        method getMaxState {} {
+            return $max
+        }
+
         method getIndex {} {
             return $index
         }
