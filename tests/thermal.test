@@ -1,0 +1,216 @@
+#!/usr/bin/env tclsh
+# thermal.test -- Tests for the thermal module.
+#
+# Copyright (C) 2023        Armin Wolf <W_Armin@gmx.de>
+#
+# This program is free software; you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by the
+# Free Software Foundation; either version 2, or (at your option) any
+# later version.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# General Public License for more details.
+
+package require Tcl 8.6
+package require tcltest
+package require generator
+
+package require i8k::thermal
+
+proc setupFakeCoolingDevice {deviceIndex deviceType maxState initialState} {
+    set fakeDevicePath [tcltest::makeDirectory "cooling_device$deviceIndex"]
+
+    tcltest::makeFile "$deviceType\n" "type" $fakeDevicePath
+    tcltest::makeFile "$maxState\n" "max_state" $fakeDevicePath
+    tcltest::makeFile "$initialState\n" "cur_state" $fakeDevicePath
+
+    return
+}
+
+proc cleanupFakeCoolingDevice {deviceIndex} {
+    tcltest::removeDirectory "cooling_device$deviceIndex"
+
+    return
+}
+
+try {
+    # Test regarding thermal::detectFans
+
+    tcltest::test detectFansNone-1.0 "test missing fans detection" -setup {
+        setupFakeCoolingDevice 0 "Processor" 6 0
+    } -body {
+        set fans 0
+
+        generator foreach fan [thermal::detectFans [tcltest::temporaryDirectory]] {
+            $fan destroy
+
+            incr fans
+        }
+
+        return $fans
+    } -cleanup {
+        cleanupFakeCoolingDevice 0
+    } -result {0}
+
+    tcltest::test detectFansSingle-1.0 "test single fan detection" -setup {
+        setupFakeCoolingDevice 0 "dell-smm-fan1" 2 0
+    } -body {
+        set fans 0
+
+        generator foreach fan [thermal::detectFans [tcltest::temporaryDirectory]] {
+            $fan destroy
+
+            incr fans
+        }
+
+        return $fans
+    } -cleanup {
+        cleanupFakeCoolingDevice 0
+    } -result {1}
+
+    tcltest::test detectFansMultiple-1.0 "test multiple fans detection" -setup {
+        setupFakeCoolingDevice 0 "dell-smm-fan1" 2 0
+        setupFakeCoolingDevice 1 "dell-smm-fan2" 3 1
+    } -body {
+        set fans 0
+
+        generator foreach fan [thermal::detectFans [tcltest::temporaryDirectory]] {
+            $fan destroy
+
+            incr fans
+        }
+
+        return $fans
+    } -cleanup {
+        cleanupFakeCoolingDevice 0
+        cleanupFakeCoolingDevice 1
+    } -result {2}
+
+    tcltest::test detectFansInvalid-1.0 "test invalid fans detection" -setup {
+        setupFakeCoolingDevice 0 "dell-smm-fanX" 2 0
+        setupFakeCoolingDevice 1 "dell-smm-fan2" T 1
+    } -body {
+        set fans 0
+
+        generator foreach fan [thermal::detectFans [tcltest::temporaryDirectory]] {
+            $fan destroy
+
+            incr fans
+        }
+
+        return $fans
+    } -cleanup {
+        cleanupFakeCoolingDevice 0
+        cleanupFakeCoolingDevice 1
+    } -result {0}
+
+    # Tests regarding thermal::fan::getIndex
+
+    tcltest::test getIndex-1.0 "test getting the fan index" -setup {
+        setupFakeCoolingDevice 0 "dell-smm-fan2" 2 0
+    } -body {
+        generator next [thermal::detectFans [tcltest::temporaryDirectory]] fan
+
+        try {
+            set index [$fan getIndex]
+        } finally {
+            $fan destroy
+        }
+
+        return $index
+    } -cleanup {
+        cleanupFakeCoolingDevice 0
+    } -result {2}
+
+    # Tests regarding thermal::fan::getMaxState
+
+    tcltest::test getMaxState-1.0 "test getting the max. fan state" -setup {
+        setupFakeCoolingDevice 0 "dell-smm-fan1" 2 0
+    } -body {
+        generator next [thermal::detectFans [tcltest::temporaryDirectory]] fan
+
+        try {
+            set max [$fan getMaxState]
+        } finally {
+            $fan destroy
+        }
+
+        return $max
+    } -cleanup {
+        cleanupFakeCoolingDevice 0
+    } -result {2}
+
+    # Tests regarding thermal::fan::isSetable
+
+    tcltest::test isSetable-1.0 "test is fan state is setable" -setup {
+        setupFakeCoolingDevice 0 "dell-smm-fan1" 2 0
+    } -body {
+        generator next [thermal::detectFans [tcltest::temporaryDirectory]] fan
+
+        try {
+            set setable [$fan isSetable]
+        } finally {
+            $fan destroy
+        }
+
+        return $setable
+    } -cleanup {
+        cleanupFakeCoolingDevice 0
+    } -result {1}
+
+    # Tests regarding thermal::fan::getState
+
+    tcltest::test getState-1.0 "test getting the fan state" -setup {
+        setupFakeCoolingDevice 0 "dell-smm-fan1" 2 1
+    } -body {
+        generator next [thermal::detectFans [tcltest::temporaryDirectory]] fan
+
+        try {
+            set state [$fan getState]
+        } finally {
+            $fan destroy
+        }
+
+        return $state
+    } -cleanup {
+        cleanupFakeCoolingDevice 0
+    } -result {1}
+
+    # Tests regarding thermal::fan::setState
+
+    tcltest::test setState-1.0 "test setting the fan state" -setup {
+        setupFakeCoolingDevice 0 "dell-smm-fan1" 2 1
+    } -body {
+        generator next [thermal::detectFans [tcltest::temporaryDirectory]] fan
+
+        try {
+            $fan setState 0
+        } finally {
+            $fan destroy
+        }
+
+        return [tcltest::viewFile "cooling_device0/cur_state"]
+    } -cleanup {
+        cleanupFakeCoolingDevice 0
+    } -result {0}
+
+    tcltest::test setStateMax-1.0 "test setting an invalid fan state" -setup {
+        setupFakeCoolingDevice 0 "dell-smm-fan1" 2 1
+    } -body {
+        generator next [thermal::detectFans [tcltest::temporaryDirectory]] fan
+
+        try {
+            $fan setState 3
+        } finally {
+            $fan destroy
+        }
+    } -cleanup {
+        cleanupFakeCoolingDevice 0
+    } -errorCode {FAN {invalid state}} -result {cooling state 3 exceeds max. cooling state 2}
+} finally {
+    tcltest::cleanupTests
+}
+
+return

@@ -1,0 +1,216 @@
+#!/usr/bin/env tclsh
+# hwmon.test -- Tests for the hwmon module.
+#
+# Copyright (C) 2023        Armin Wolf <W_Armin@gmx.de>
+#
+# This program is free software; you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by the
+# Free Software Foundation; either version 2, or (at your option) any
+# later version.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# General Public License for more details.
+
+package require Tcl 8.6
+package require tcltest
+package require generator
+
+package require i8k::hwmon
+
+set fanSensorAttributes {
+    "fan1_input" 2500
+    "label1_label" "Processor Fan"
+    "pwm1" 128
+}
+
+set singleSensorAttributes {
+    "temp1_input" 47000
+    "temp1_label" "CPU"
+}
+
+set multipleSensorAttributes {
+    "temp1_input" 47000
+    "temp1_label" "CPU"
+    "temp2_input" 33000
+    "temp2_label" "GPU"
+    "fan1_input" 2500
+    "fan1_label" "Processor Fan"
+    "pwm1" 128
+}
+
+proc setupFakeChip {chipIndex chipName attributes} {
+    set fakeChipPath [tcltest::makeDirectory "hwmon$chipIndex"]
+
+    tcltest::makeFile "$chipName\n" "name" $fakeChipPath
+
+    foreach {name initialValue} $attributes {
+        tcltest::makeFile "$initialValue\n" $name $fakeChipPath
+    }
+
+    return
+}
+
+proc cleanupFakeChip {chipIndex} {
+    tcltest::removeDirectory "hwmon$chipIndex"
+
+    return
+}
+
+try {
+    # Test regarding hwmon::detectChip
+
+    tcltest::test detectChipNone-1.0 "test missing hwmon chip detection" -setup {
+        setupFakeChip 1 "acpi" {
+            "temp1_input" 47000
+            "temp1_label" "Processor"
+        }
+    } -body {
+        hwmon::detectChip [tcltest::temporaryDirectory]
+    } -cleanup {
+        cleanupFakeChip 1
+    } -errorCode {HWMON {no chip}} -result {no suitable hwmon chip found}
+
+    tcltest::test detectChipSingle-1.0 "test single hwmon chip detection" -setup {
+        setupFakeChip 0 "dell_smm" $singleSensorAttributes
+    } -body {
+        hwmon::detectChip [tcltest::temporaryDirectory]
+    } -cleanup {
+        cleanupFakeChip 0
+    } -match {regexp} -result {\/hwmon0$}
+
+    tcltest::test detectChipMultiple-1.0 "test multiple hwmon chip detection" -setup {
+        setupFakeChip 0 "sch5627" $multipleSensorAttributes
+        setupFakeChip 1 "dell_smm" $multipleSensorAttributes
+        setupFakeChip 2 "acpi" $singleSensorAttributes
+    } -body {
+        hwmon::detectChip [tcltest::temporaryDirectory]
+    } -cleanup {
+        cleanupFakeChip 0
+        cleanupFakeChip 1
+        cleanupFakeChip 2
+    } -match {regexp} -result {\/hwmon1$}
+
+    tcltest::test detectChipEmpty-1.0 "test empty hwmon chip detection" -setup {
+        setupFakeChip 0 "amdgpu" $multipleSensorAttributes
+        setupFakeChip 1 "dell_smm" {}
+    } -body {
+        hwmon::detectChip [tcltest::temporaryDirectory]
+    } -cleanup {
+        cleanupFakeChip 0
+        cleanupFakeChip 1
+    } -match {regexp} -result {\/hwmon1$}
+
+    # Tests regarding hwmon::detectSensors
+
+    tcltest::test detectSensorNone1.0 "test mising temperature sensor detection" -setup {
+        setupFakeChip 1 "dell_smm" $fanSensorAttributes
+    } -body {
+        set chip [hwmon::detectChip [tcltest::temporaryDirectory]]
+        set sensorCount 0
+
+        generator foreach sensor [hwmon::detectSensors $chip] {
+            $sensor destroy
+            incr sensorCount
+        }
+
+        return $sensorCount
+    } -cleanup {
+        cleanupFakeChip 1
+    } -result {0}
+
+    tcltest::test detectSensorSingle-1.0 "test single temperature sensor detection" -setup {
+        setupFakeChip 1 "dell_smm" $singleSensorAttributes
+    } -body {
+        set chip [hwmon::detectChip [tcltest::temporaryDirectory]]
+        set sensorCount 0
+
+        generator foreach sensor [hwmon::detectSensors $chip] {
+            $sensor destroy
+            incr sensorCount
+        }
+
+        return $sensorCount
+    } -cleanup {
+        cleanupFakeChip 1
+    } -result {1}
+
+    tcltest::test detectSensorMultiple1.0 "test multiple temperature sensors detection" -setup {
+        setupFakeChip 1 "dell_smm" $multipleSensorAttributes
+    } -body {
+        set chip [hwmon::detectChip [tcltest::temporaryDirectory]]
+        set sensorCount 0
+
+        generator foreach sensor [hwmon::detectSensors $chip] {
+            $sensor destroy
+            incr sensorCount
+        }
+
+        return $sensorCount
+    } -cleanup {
+        cleanupFakeChip 1
+    } -result {2}
+
+    # Tests regarding hwmon::getSensor
+
+    tcltest::test getSensorNone1.0 "test failure when trying to get a missing sensor" -setup {
+        setupFakeChip 1 "dell_smm" $singleSensorAttributes
+    } -body {
+        set chip [hwmon::detectChip [tcltest::temporaryDirectory]]
+        set sensor [hwmon::getSensor $chip 2]
+
+        $sensor destroy
+    } -cleanup {
+        cleanupFakeChip 1
+    } -match {glob} -errorCode {POSIX ENOENT {no such file or directory}} -result {couldn't open "*": no such file or directory}
+
+    tcltest::test getSensor1.0 "test getting a sensor" -setup {
+        setupFakeChip 1 "dell_smm" $singleSensorAttributes
+    } -body {
+        set chip [hwmon::detectChip [tcltest::temporaryDirectory]]
+        set sensor [hwmon::getSensor $chip 1]
+
+        $sensor destroy
+
+        return 0
+    } -cleanup {
+        cleanupFakeChip 1
+    } -result {0}
+
+    # Tests regarding hwmon::sensor:GetIndex
+
+    tcltest::test sensorGetIndex1.0 "test getting the sensor index" -setup {
+        setupFakeChip 1 "dell_smm" $singleSensorAttributes
+    } -body {
+        set chip [hwmon::detectChip [tcltest::temporaryDirectory]]
+        set sensor [hwmon::getSensor $chip 1]
+        set index [$sensor getIndex]
+
+        $sensor destroy
+
+        return $index
+    } -cleanup {
+        cleanupFakeChip 1
+    } -result {1}
+
+    # Tests regarding hwmon::sensor:GetTemperature
+
+    tcltest::test sensorGetTemperature1.0 "test getting the sensor temperature" -setup {
+        setupFakeChip 1 "dell_smm" $singleSensorAttributes
+    } -body {
+        set chip [hwmon::detectChip [tcltest::temporaryDirectory]]
+        set sensor [hwmon::getSensor $chip 1]
+        set temp [$sensor getTemperature]
+
+        $sensor destroy
+
+        return $temp
+    } -cleanup {
+        cleanupFakeChip 1
+    } -result {47000}
+} finally {
+    tcltest::cleanupTests
+}
+
+return

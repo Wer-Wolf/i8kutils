@@ -152,13 +152,24 @@ To build the programs type the following commands:
 INSTALLATION
 ============
 
-To install i8kutils, type the following commands:
+To install i8kutils, enter the following command:
 
     sudo meson install
 
 You must then manually install the provided init scripts if necessary.
 For enabling i8kmon to read the battery status, you must also install
 'acpi', otherwise i8kmon will assume that it always runs on ac power.
+
+TESTING
+=======
+
+To execute some basic tests, enter the following command:
+
+    meson test
+
+This will execute some basic tests and print the results. Please note
+that those test only test the basic hardware tcl modules, not the
+applications.
 
 CONTRIBUTORS
 ============
