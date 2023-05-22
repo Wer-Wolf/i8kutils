@@ -38,27 +38,7 @@ LICENCE
 =======
 
 This software is released under the terms of the GNU General Public
-Licence.
-
-   Copyright (C) 2001-2009 Massimo Dal Zotto <dz@debian.org>
-
-   This program is free software; you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 2 of the License, or
-   (at your option) any later version.
-
-   This program is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-
-   You should have received a copy of the GNU General Public License
-   along with this program; if not, write to the Free Software Foundation,
-   Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
-
-On Debian GNU/Linux systems, the complete text of the GNU General
-Public License can be found in `/usr/share/common-licenses/GPL'.
-
+Licence, see `COPYING` for details.
 
 THE KERNEL MODULE
 =================
@@ -143,7 +123,7 @@ Gentoo
 BUILDING
 ========
 
-To build the programs type the following commands:
+To build the programs enter the following commands:
 
     meson build --prefix="/usr"
     cd build
@@ -168,13 +148,11 @@ To execute some basic tests, enter the following command:
     meson test
 
 This will execute some basic tests and print the results. Please note
-that those test only test the basic hardware tcl modules, not the
-applications.
+that those test only test the installed tcl modules used for hardware
+access, not the applications itself.
 
 CONTRIBUTORS
 ============
-
-Contributors are listed here, in alphabetical order.
 
 * Pablo Bianucci <pbian@physics.utexas.edu>
     * support for /proc/acpi
@@ -204,6 +182,9 @@ Contributors are listed here, in alphabetical order.
 
 * Vitor Augusto <vitorafsr@gmail.com>
     * fixes for the freeze bug at i8kmon, general update and bug fixes
+
+* Massimo Dal Zotto <dz@debian.org>
+    * initial developer
 
 and many others who tested the driver on their hardware and sent reports
 and patches.
