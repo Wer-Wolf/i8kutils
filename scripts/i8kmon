@@ -238,6 +238,7 @@ proc main {args path} {
     global error
 
     set config [dict create {*}[readConfig $path]]
+    set uncontrollableFans 0
     set fans [dict create]
     set log [logger::init i8kmon]
 
@@ -259,6 +260,7 @@ proc main {args path} {
     generator foreach fan [thermal::detectFans] {
         if {![$fan isSetable]} {
             $fan destroy
+            incr uncontrollableFans
 
             continue
         }
@@ -271,7 +273,11 @@ proc main {args path} {
     }
 
     if {[dict size $fans] == 0} {
-        throw {I8KMON ERROR} "no controllable fans detected"
+        if {$uncontrollableFans == 0} {
+            throw {I8KMON ERROR} "no fans detected"
+        } else {
+            throw {I8KMON ERROR} "no controllable fans detected, likely due to missing permissions"
+        }
     }
 
     # Start updatePowerStatus first to ensure onAcStatus is valid
