@@ -88,8 +88,8 @@ defines state 0 with both fans off, high threshold of 60 degrees (65 on
 battery) and low threshold \-1 degrees, which is actually never reached since 0 is the
 lowest temperature. When the high temperature threshold is reached the program switches to state
 1 (left low, right off) which has a high threshold of 70 degrees and a low
-threshold of 50 degrees. If on ac power the temperature drops below 50 the program will
-switch back to state 0, if it rises above 70 it will enter state 2, and so on.
+threshold of 50 degrees. If on ac power the temperature drops to 50 or below the program will
+switch back to state 0, if it rises to 70 or above it will enter state 2, and so on.
 For better operation the temperature ranges should be overlapping with an
 hysteresis of at least 10 degrees, i.e. 1={50 70},2={60 80} is better than
 1={50 70},2={70 80}.
