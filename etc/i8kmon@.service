@@ -1,9 +1,0 @@
-[Unit]
-Description=DELL notebook fan control
-Documentation=man:i8kmon(1)
-BindsTo=%i.device
-
-[Service]
-ExecStart=/usr/bin/i8kmon
-Restart=always
-RestartSec=5
