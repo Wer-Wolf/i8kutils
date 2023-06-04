@@ -30,12 +30,10 @@ package require i8k::hwmon
 set onAcPower 0
 set error ""
 
-# The fan state order is reversed (..., fan 3, fan 2, fan 1) due
-# to backwards compatibility
 proc setFans {fans fanStates log} {
     set fanNumber 0
 
-    foreach fanState [lreverse $fanStates] {
+    foreach fanState $fanStates {
         incr fanNumber
 
         if {$fanState == "-"} {
@@ -216,7 +214,7 @@ proc validateConfig {configName log} {
     }
 
     for {set index 0}  {$index < [dict get $config num_configs]} {incr index} {
-        lassign [dict get $config $index] fans lowAc highAc lowBat highBat
+        lassign [dict get $config $index] fanStates lowAc highAc lowBat highBat
 
 	    # check that for each key high temp > low temp
 	    if {$lowAc > $highAc} {
@@ -228,7 +226,9 @@ proc validateConfig {configName log} {
             set highBat [expr {$lowBat + 5}]
         }
 
-	    dict set config $index [list $fans $lowAc $highAc $lowBat $highBat]
+        # The fan state order is reversed (..., fan 3, fan 2, fan 1) due
+        # to backwards compatibility
+        dict set config $index [list [lreverse $fanStates] $lowAc $highAc $lowBat $highBat]
 
         ${log}::debug "config entry $index: battery = $lowBat °C - $highBat °C, ac = $lowAc °C - $highAc °C"
     }
