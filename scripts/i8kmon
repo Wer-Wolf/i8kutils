@@ -148,6 +148,8 @@ proc bgerror {msg} {
     global error
 
     set error $msg
+
+    return
 }
 
 proc readConfig {path} {
