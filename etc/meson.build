@@ -1,8 +1,8 @@
 dep_systemd = dependency('systemd', required : get_option('systemd_support'))
 dep_udev = dependency('udev', required : get_option('systemd_support'))
 
-fs = import('fs')
-if not fs.is_file('/etc/i8kmon.conf')
+fs = import('fs', required : get_option('default_config'))
+if fs.found() and not fs.is_file('/etc/i8kmon.conf')
   install_data('i8kmon.conf', install_dir : '/etc', install_mode : ['rw-r--r--', 'root', 'root'])
 endif
 

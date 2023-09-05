@@ -1,4 +1,6 @@
 option('systemd_support', type : 'feature', value : 'auto')
 option('sysvinit_support', type : 'feature', value : 'auto')
 
+option('default_config', type : 'feature', value : 'auto')
+
 option('moduledir', type : 'string', value: '/usr/share/tcltk/tcl8/8.6')
