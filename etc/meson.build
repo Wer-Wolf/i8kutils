@@ -1,7 +1,10 @@
 dep_systemd = dependency('systemd', required : get_option('systemd_support'))
 dep_udev = dependency('udev', required : get_option('systemd_support'))
 
-install_data('i8kmon.conf', install_dir : '/etc', install_mode : ['rw-r--r--', 'root', 'root'])
+fs = import('fs')
+if not fs.is_file('/etc/i8kmon.conf')
+  install_data('i8kmon.conf', install_dir : '/etc', install_mode : ['rw-r--r--', 'root', 'root'])
+endif
 
 if dep_systemd.found() and dep_udev.found()
   # Calling dep.get_variable(varname) fails
