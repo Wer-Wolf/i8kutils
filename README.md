@@ -125,7 +125,7 @@ BUILDING
 
 To build the programs enter the following commands:
 
-    meson build --prefix="/usr"
+    meson setup build --prefix="/usr"
     cd build
 
 
@@ -148,8 +148,8 @@ To execute some basic tests, enter the following command:
     meson test
 
 This will execute some basic tests and print the results. Please note
-that those test only test the installed tcl modules used for hardware
-access, not the applications itself.
+that those tests only test the tcl modules used for hardware access,
+not the applications itself.
 
 CONTRIBUTORS
 ============
