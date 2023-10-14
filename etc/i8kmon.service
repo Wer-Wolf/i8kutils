@@ -1,7 +1,8 @@
 [Unit]
 Description=DELL notebook fan control
 Documentation=man:i8kmon(1)
-After=sys-subsystem-hwmon-devices-dell_smm.device
+Requisite=multi-user.target
+After=sys-subsystem-hwmon-devices-dell_smm.device multi-user.target
 BindsTo=sys-subsystem-hwmon-devices-dell_smm.device
 
 [Service]
