@@ -1,4 +1,4 @@
-project('i8kutils', license : 'GPL-3.0-or-later', version : '1.53', meson_version : '>=0.62.0')
+project('i8kutils', license : 'GPL-3.0-or-later', version : '1.54', meson_version : '>=0.62.0')
 
 subdir('scripts')
 subdir('modules')
