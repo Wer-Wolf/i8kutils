@@ -23,6 +23,7 @@ set fanSensorAttributes {
     "fan1_input" 2500
     "fan1_label" "Processor Fan"
     "pwm1" 128
+    "pwm1_enable" 2
 }
 
 set singleSensorAttributes {
@@ -38,6 +39,7 @@ set multipleSensorAttributes {
     "fan1_input" 2500
     "fan1_label" "Processor Fan"
     "pwm1" 128
+    "pwm1_enable" 1
 }
 
 proc setupFakeChip {chipIndex chipName attributes} {
@@ -209,6 +211,84 @@ try {
     } -cleanup {
         cleanupFakeChip 1
     } -result {47000}
+
+    # Tests regarding hwmon::getFanMode
+
+    tcltest::test getFanModeNone1.0 "test failure when trying to get a missing fan mode control" -setup {
+        setupFakeChip 1 "dell_smm" $singleSensorAttributes
+    } -body {
+        set chip [hwmon::detectChip [tcltest::temporaryDirectory]]
+        set fanMode [hwmon::getFanMode $chip 1]
+
+        $fanMode destroy
+    } -cleanup {
+        cleanupFakeChip 1
+    } -match {glob} -errorCode {POSIX ENOENT {no such file or directory}} -result {couldn't open "*": no such file or directory}
+
+    tcltest::test getFanMode1.0 "test getting a fan mode control" -setup {
+        setupFakeChip 1 "dell_smm" $fanSensorAttributes
+    } -body {
+        set chip [hwmon::detectChip [tcltest::temporaryDirectory]]
+        set fanMode [hwmon::getFanMode $chip 1]
+
+        $fanMode destroy
+
+        return 0
+    } -cleanup {
+        cleanupFakeChip 1
+    } -result {0}
+
+    # Tests regarding hwmon::fanMode:GetIndex
+
+    tcltest::test fanModeGetIndex1.0 "test getting the fan mode controls index" -setup {
+        setupFakeChip 1 "dell_smm" $fanSensorAttributes
+    } -body {
+        set chip [hwmon::detectChip [tcltest::temporaryDirectory]]
+        set fanMode [hwmon::getFanMode $chip 1]
+        set index [$fanMode getIndex]
+
+        $fanMode destroy
+
+        return $index
+    } -cleanup {
+        cleanupFakeChip 1
+    } -result {1}
+
+    # Tests regarding hwmon::fanMode:SetMode
+
+    tcltest::test fanModeSetAutomatic1.0 "test setting automatic fan control mode" -setup {
+        setupFakeChip 1 "dell_smm" $multipleSensorAttributes
+    } -body {
+        set chip [hwmon::detectChip [tcltest::temporaryDirectory]]
+        set fanMode [hwmon::getFanMode $chip 1]
+
+        try {
+            $fanMode setMode "automatic"
+        } finally {
+            $fanMode destroy
+        }
+
+        return [tcltest::viewFile "hwmon1/pwm1_enable"]
+    } -cleanup {
+        cleanupFakeChip 1
+    } -result {2}
+
+    tcltest::test fanModeSetmanual1.0 "test setting manual fan control mode" -setup {
+        setupFakeChip 1 "dell_smm" $fanSensorAttributes
+    } -body {
+        set chip [hwmon::detectChip [tcltest::temporaryDirectory]]
+        set fanMode [hwmon::getFanMode $chip 1]
+
+        try {
+            $fanMode setMode "manual"
+        } finally {
+            $fanMode destroy
+        }
+
+        return [tcltest::viewFile "hwmon1/pwm1_enable"]
+    } -cleanup {
+        cleanupFakeChip 1
+    } -result {1}
 } finally {
     tcltest::cleanupTests
 }
