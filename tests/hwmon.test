@@ -21,7 +21,7 @@ package require i8k::hwmon
 
 set fanSensorAttributes {
     "fan1_input" 2500
-    "label1_label" "Processor Fan"
+    "fan1_label" "Processor Fan"
     "pwm1" 128
 }
 
