@@ -50,6 +50,47 @@ namespace eval hwmon {
         }
     }
 
+    oo::class create fanMode {
+        variable channel
+        variable index
+
+        constructor {inputChannel sensorIndex} {
+            chan configure $inputChannel -buffering none -translation binary
+            set channel $inputChannel
+            set index $sensorIndex
+
+            return
+        }
+
+        method setMode {mode} {
+            switch $mode {
+                "manual" {
+                    set token 1
+                }
+                "automatic" {
+                    set token 2
+                }
+                default {
+                    throw {FANMODE {invalid mode}} "invalid fan mode $mode"
+                }
+            }
+
+            chan puts -nonewline $channel $token
+
+            return
+        }
+
+        method getIndex {} {
+            return $index
+        }
+
+        destructor {
+            chan close $channel
+
+            return
+        }
+    }
+
     proc SetupSensor {path attr} {
         set fullPath [format "%s/%s" $path $attr]
         set index [scan $attr "temp%u_input"]
@@ -68,6 +109,13 @@ namespace eval hwmon {
         }
 
         return
+    }
+
+    proc getFanMode {chipDirectory number} {
+        set fullPath [format "%s/pwm%u_enable" $chipDirectory $number]
+        set channel [open $fullPath WRONLY]
+
+        return [fanMode new $channel $number]
     }
 
     proc detectChip {{hwmonDirectory "/sys/class/hwmon"}} {
