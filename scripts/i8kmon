@@ -127,7 +127,11 @@ proc updatePowerStatus {log} {
             ${log}::info "power status: assuming ac power"
             set onAcPower 1
         } else {
-            if {[string match *on-line* $result]} {
+            if {[string match "" $result]} {
+                # The command might succeed without printing anything
+                ${log}::info "power status: assuming ac power"
+                set onAcPower 1
+            } elseif {[string match *on-line* $result]} {
                 ${log}::info "power status: running on ac power ($result)"
                 set onAcPower 1
             } else {
