@@ -132,6 +132,9 @@ proc sensorRead {sensorType sensorNumber} {
 
             throw {I8KCTL ERROR} "fan $sensorNumber not found"
         }
+        "mode" {
+            throw {I8KCTL ERROR} "reading fan modes is not supported"
+        }
         "temp" {
             try {
                 set chip [hwmon::detectChip]
@@ -169,6 +172,22 @@ proc sensorWrite {sensorType sensorNumber value} {
             }
 
             throw {I8KCTL ERROR} "fan $sensorNumber not found"
+        }
+        "mode" {
+            try {
+                set chip [hwmon::detectChip]
+                set fanMode [hwmon::getFanMode $chip $sensorNumber]
+            } trap {} {msg} {
+                throw {I8KCTL ERROR} "fan $sensorNumber mode controls not found: $msg"
+            }
+
+            try {
+                $fanMode setMode $value
+            } finally {
+                $fanMode destroy
+            }
+
+            return
         }
         "temp" {
             throw {I8KCTL ERROR} "writing temperature sensors is not supported"

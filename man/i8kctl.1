@@ -23,9 +23,11 @@ When invoked without arguments it lists all available sensors and
 their values.
 .LP
 If 'sensor' is specified and contains a valid sensor name, its reading is being displayed.
-Valid sensor names are 'fan[number]' for fan sensors (fan1, fan2, ...) and 'temp[number]' for
-temperature sensors (temp1, temp2, ...). If 'state' is also specified, the value of the sensor
-is being set to 'state'.
+Valid sensor names are 'fan[number]' for fan sensors (fan1, fan2, ...), 'temp[number]' for
+temperature sensors (temp1, temp2, ...) and 'mode[number] for fan mode controls (mode1,
+mode2, ...). If 'state' is also specified, the value of the sensor is being set to 'state'.
+.LP
+Fan sensors support numeric states, while fan mode controls support either 'manual' or 'automatic'.
 
 .SH OPTIONS
 .IP "-?, -help"
