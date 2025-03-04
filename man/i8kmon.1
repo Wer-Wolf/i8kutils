@@ -60,6 +60,12 @@ and causes stutter and lags.
 Since some machines need periodic fan speed updates,
 this option is disabled by default.
 .TP
+\fBset config(average)\fR 1
+Average the temperature measurements over the last n samples.
+Useful for dealing with temperature spikes found on some hardware,
+but increasing this value will result in a slower response to
+temperature changes. Numbers below 1 are invalid.
+.TP
 \fBset config(timeout)\fR 2
 Timeout, default is 2.
 .TP

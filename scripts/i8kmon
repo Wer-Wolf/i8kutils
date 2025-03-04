@@ -23,6 +23,7 @@ package require defer
 package require fileutil
 package require generator
 package require logger
+package require struct::queue
 
 package require i8k::thermal
 package require i8k::hwmon
@@ -66,13 +67,31 @@ proc fanControl {config fans temp log} {
     set previousState -1
     set currentState 0
 
+    # Queue used for smoothing the temperature values
+    set history [struct::queue]
+    defer::defer ${history} delete
+
+    # Initialize the temperature history with 0
+    for {set i 0} {$i < [dict get $config average]} {incr i} {
+        $history put 0
+    }
+
     while {1} {
         set index [expr {$onAcPower ? 1 : 3}]
 
         try {
             set temperature [expr {[$temp getTemperature] / 1000}]
 
-            ${log}::debug "temperature: $temperature °C"
+            ${log}::debug "device temperature: $temperature °C"
+
+            # Smooth the temperature by averaging the last n temperature samples
+            $history get
+            $history put $temperature
+
+            set sum [::tcl::mathop::+ {*}[$history peek [$history size]]]
+            set temperature [expr {$sum / [$history size]}]
+
+            ${log}::debug "averaged temperature to $temperature °C"
 
             for {} {$currentState < [expr {[dict get $config num_configs] - 1}]} {incr currentState} {
                 set temperatureHigh [lindex [dict get $config $currentState] [expr $index + 1]]
@@ -161,6 +180,7 @@ proc readConfig {path} {
         verbose     0
         ondemand    0
         timeout     2
+        average     1
         num_configs 5
         0           {{0 0}  -1  50  -1  50}
         1           {{0 1}  45  55  45  55}
@@ -217,6 +237,10 @@ proc validateConfig {configName log} {
 
     if {[dict get $config verbose] > 0} {
         ${log}::setlevel debug
+    }
+
+    if {[dict get $config average] < 1} {
+        throw {I8KMON ERROR} "number of temperature samples used for averaging is invalid"
     }
 
     for {set index 0}  {$index < [dict get $config num_configs]} {incr index} {
