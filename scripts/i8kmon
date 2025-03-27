@@ -181,6 +181,8 @@ proc readConfig {path} {
         ondemand    0
         timeout     2
         average     1
+        chip_name   "dell_smm"
+        temp_sensor 1
         num_configs 5
         0           {{0 0}  -1  50  -1  50}
         1           {{0 1}  45  55  45  55}
@@ -243,6 +245,10 @@ proc validateConfig {configName log} {
         throw {I8KMON ERROR} "number of temperature samples used for averaging is invalid"
     }
 
+    if {[dict get $config temp_sensor] < 1} {
+        throw {I8KMON ERROR} "temperature sensor index is invalid"
+    }
+
     for {set index 0}  {$index < [dict get $config num_configs]} {incr index} {
         lassign [dict get $config $index] fanStates lowAc highAc lowBat highBat
 
@@ -279,8 +285,8 @@ proc main {args path} {
     validateConfig config $log
 
     try {
-        set hwmonChip [hwmon::detectChip]
-        set temp [hwmon::getSensor $hwmonChip 1]
+        set hwmonChip [hwmon::detectChip [dict get $config chip_name]]
+        set temp [hwmon::getSensor $hwmonChip [dict get $config temp_sensor]]
     } trap {} {msg} {
         throw {I8KMON ERROR} "temperature sensor not found: $msg"
     }

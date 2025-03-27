@@ -66,6 +66,13 @@ Useful for dealing with temperature spikes found on some hardware,
 but increasing this value will result in a slower response to
 temperature changes. Numbers below 1 are invalid.
 .TP
+\fBset config(chip_name)\fR "dell_smm"
+Name of the hwmon chip used to retrieve temperature readings.
+.TP
+\fBset config(temp_sensor)\fR 1
+Index of the temperature sensor associated with the hwmon chip
+used to retrieve temperature readings. Values below 1 are invalid.
+.TP
 \fBset config(timeout)\fR 2
 Timeout, default is 2.
 .TP
