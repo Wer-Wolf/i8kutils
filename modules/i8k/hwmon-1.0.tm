@@ -118,12 +118,12 @@ namespace eval hwmon {
         return [fanMode new $channel $number]
     }
 
-    proc detectChip {{hwmonDirectory "/sys/class/hwmon"}} {
+    proc detectChip {{chipName "dell_smm"} {hwmonDirectory "/sys/class/hwmon"}} {
         foreach chip [glob -directory $hwmonDirectory -types {d r} -nocomplain "hwmon*"] {
             set namePath [format "%s/name" $chip]
             set name [fileutil::cat -translation binary $namePath]
 
-            if {[string equal $name "dell_smm\n"] == 1} {
+            if {[string equal $name "$chipName\n"] == 1} {
                 return $chip
             }
         }
