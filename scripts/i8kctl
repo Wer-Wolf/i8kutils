@@ -16,7 +16,8 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 # General Public License for more details.
 
-package require Tcl 8.6
+# Necessary until we fully migrate to Tcl 9.0
+# package require Tcl 8.6
 package require cmdline 1.5
 package require defer
 package require generator
