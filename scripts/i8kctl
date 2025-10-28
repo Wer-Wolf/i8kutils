@@ -32,6 +32,8 @@ proc printFan {fan} {
         set state [$fan getState]
 
         puts "fan $index state: $state"
+    } trap {POSIX ENODATA} {msg} {
+        puts "fan $index state: N/A"
     } trap {POSIX} {msg} {
         throw {I8KCTL ERROR} "unable to read fan $index: $msg"
     }
