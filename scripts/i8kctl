@@ -25,6 +25,20 @@ package require generator
 package require i8k::thermal
 package require i8k::hwmon
 
+proc printMode {mode} {
+    set index [$mode getIndex]
+
+    try {
+        set current [$mode getMode]
+
+        puts "fan $index mode: $current"
+    } trap {POSIX} {msg} {
+        throw {I8KCTL ERROR} "unable to read fan $index mode control: $msg"
+    }
+
+    return
+}
+
 proc printFan {fan} {
     set index [$fan getIndex]
 
@@ -121,6 +135,8 @@ proc sensorOverview {} {
 }
 
 proc sensorRead {sensorType sensorNumber} {
+    set chip [hwmon::detectChip]
+
     switch $sensorType {
         "fan" {
             generator foreach fan [filterFans [thermal::detectFans] $sensorNumber] {
@@ -136,11 +152,23 @@ proc sensorRead {sensorType sensorNumber} {
             throw {I8KCTL ERROR} "fan $sensorNumber not found"
         }
         "mode" {
-            throw {I8KCTL ERROR} "reading fan modes is not supported"
+            try {
+                set mode [hwmon::getFanMode $chip $sensorNumber]
+            } trap {} {msg} {
+                throw {I8KCTL ERROR} "fan $sensorNumber mode controls not found: $msg"
+            }
+
+            defer::defer $mode destroy
+
+            if {[$mode isReadable]} {
+                printMode $mode
+                return
+            }
+
+            throw {I8KCTL ERROR} "reading from fan mode controls is not supported on this machine"
         }
         "temp" {
             try {
-                set chip [hwmon::detectChip]
                 set temp [hwmon::getSensor $chip $sensorNumber]
             } trap {} {msg} {
                 throw {I8KCTL ERROR} "temperature sensor $sensorNumber not found: $msg"
