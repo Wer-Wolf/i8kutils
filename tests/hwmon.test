@@ -254,7 +254,43 @@ try {
         cleanupFakeChip 1
     } -result {1}
 
-    # Tests regarding hwmon::fanMode:SetMode
+    # Tests regarding hwmon::fanMode:getMode
+
+    tcltest::test fanModeGetAutomatic1.0 "test reading automatic fan control mode" -setup {
+        setupFakeChip 1 "dell_smm" $fanSensorAttributes
+    } -body {
+        set chip [hwmon::detectChip "dell_smm" [tcltest::temporaryDirectory]]
+        set fanMode [hwmon::getFanMode $chip 1]
+
+        try {
+            set mode [$fanMode getMode]
+        } finally {
+            $fanMode destroy
+        }
+
+        return $mode
+    } -cleanup {
+        cleanupFakeChip 1
+    } -result {automatic}
+
+    tcltest::test fanModeGetManual1.0 "test reading manual fan control mode" -setup {
+        setupFakeChip 1 "dell_smm" $multipleSensorAttributes
+    } -body {
+        set chip [hwmon::detectChip "dell_smm" [tcltest::temporaryDirectory]]
+        set fanMode [hwmon::getFanMode $chip 1]
+
+        try {
+            set mode [$fanMode getMode]
+        } finally {
+            $fanMode destroy
+        }
+
+        return $mode
+    } -cleanup {
+        cleanupFakeChip 1
+    } -result {manual}
+
+    # Tests regarding hwmon::fanMode:setMode
 
     tcltest::test fanModeSetAutomatic1.0 "test setting automatic fan control mode" -setup {
         setupFakeChip 1 "dell_smm" $multipleSensorAttributes

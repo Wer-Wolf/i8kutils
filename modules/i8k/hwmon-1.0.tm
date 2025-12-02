@@ -63,6 +63,23 @@ namespace eval hwmon {
             return
         }
 
+        method getMode {} {
+            chan seek $channel 0
+            set mode [chan read -nonewline $channel]
+
+            switch $mode {
+                1 {
+                    return "manual"
+                }
+                2 {
+                    return "automatic"
+                }
+                default {
+                    throw {FANMODE {invalid mode}} "invalid fan mode $mode"
+                }
+            }
+        }
+
         method setMode {mode} {
             switch $mode {
                 "manual" {
@@ -79,6 +96,14 @@ namespace eval hwmon {
             chan puts -nonewline $channel $token
 
             return
+        }
+
+        method isSetable {} {
+            return [expr {[chan pending output $channel] != -1}]
+        }
+
+        method isReadable {} {
+            return [expr {[chan pending input $channel] != -1}]
         }
 
         method getIndex {} {
@@ -114,7 +139,17 @@ namespace eval hwmon {
 
     proc getFanMode {chipDirectory number} {
         set fullPath [format "%s/pwm%u_enable" $chipDirectory $number]
-        set channel [open $fullPath WRONLY]
+
+        try {
+            set channel [open $fullPath "rb+"]
+        } trap {POSIX EACCES} {} {
+            try {
+                set channel [open $fullPath "rb"]
+            } trap {POSIX EACCES} {} {
+                # Some machines only permit write access to fan mode controls
+                set channel [open $fullPath WRONLY]
+            }
+        }
 
         return [fanMode new $channel $number]
     }
