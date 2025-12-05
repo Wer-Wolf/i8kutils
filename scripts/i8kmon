@@ -287,6 +287,12 @@ proc main {args path} {
 
     try {
         set hwmonChip [hwmon::detectChip [dict get $config chip_name]]
+        set legacyFanControl [hwmon::hasLegacyFanControl $hwmonChip]
+    } trap {} {msg} {
+        throw {I8KMON ERROR} "hwmon initialization failed: $msg"
+    }
+
+    try {
         set temp [hwmon::getSensor $hwmonChip [dict get $config temp_sensor]]
     } trap {} {msg} {
         throw {I8KMON ERROR} "temperature sensor not found: $msg"
@@ -314,6 +320,20 @@ proc main {args path} {
             throw {I8KMON ERROR} "no fans detected"
         } else {
             throw {I8KMON ERROR} "no controllable fans detected, likely due to missing permissions"
+        }
+    }
+
+    # The dell-smm-hwmon driver will automatically switch the fans to manual fan
+    # control mode when modern fan control is supported on a given device
+    if {$legacyFanControl} {
+        set modeControl [hwmon::getFanMode $hwmonChip 1]
+
+        try {
+            $modeControl setMode "manual"
+        } trap {} {msg} {
+            throw {I8KMON ERROR} "unable to switch to manual fan control mode: $msg"
+        } finally {
+            $modeControl destroy
         }
     }
 

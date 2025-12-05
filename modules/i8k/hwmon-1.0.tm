@@ -137,6 +137,19 @@ namespace eval hwmon {
         return
     }
 
+    proc hasLegacyFanControl {chipDirectory} {
+        try {
+            # file readable is broken under Tcl 8.6
+            if {[expr {[file attributes [format "%s/pwm1_enable" $chipDirectory] -permissions] == 0o200}]} {
+                return 1
+            }
+        } trap {POSIX ENOENT} {} {
+            return 0
+        }
+
+        return 0
+    }
+
     proc getFanMode {chipDirectory number} {
         set fullPath [format "%s/pwm%u_enable" $chipDirectory $number]
 

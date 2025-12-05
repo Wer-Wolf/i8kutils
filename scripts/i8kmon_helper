@@ -1,0 +1,59 @@
+#!/usr/bin/env tclsh
+#
+# i8kmon_helper -- Helper script for disabling fan control from the systemd unit.
+#
+# Copyright (C) 2025        Armin Wolf <W_Armin@gmx.de>
+#
+# This program is free software; you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by the
+# Free Software Foundation; either version 2, or (at your option) any
+# later version.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# General Public License for more details.
+
+# Necessary until we fully migrate to Tcl 9.0
+# package require Tcl 8.6
+package require generator
+
+package require i8k::thermal
+package require i8k::hwmon
+
+set chip [hwmon::detectChip]
+
+if {[hwmon::hasLegacyFanControl $chip]} {
+    set mode [hwmon::getFanMode $chip 1]
+
+    try {
+        $mode setMode "automatic"
+    } finally {
+        $mode destroy
+    }
+
+    return
+}
+
+generator foreach fan [thermal::detectFans] {
+    try {
+        if {[$fan isSetable]} {
+            set index [$fan getIndex]
+            try {
+                set mode [hwmon::getFanMode $chip $index]
+
+                try {
+                    $mode setMode "automatic"
+                } finally {
+                    $mode destroy
+                }
+            } trap {} {} {
+                puts "Unable to switch back to automatic fan control for fan $index"
+            }
+        }
+    } finally {
+        $fan destroy
+    }
+}
+
+return
